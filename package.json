@@ -4,7 +4,7 @@
   "scripts": {
     "build": "node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.cpSync('cf-public','dist',{recursive:true});\""
   },
-  "devDependencies": {
+  "dependencies": {
     "wrangler": "^4.28.0"
   }
 }
