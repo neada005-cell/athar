@@ -134,7 +134,6 @@ function bindShare() {
 function wallView(copy) {
   const share = location.origin + "/share";
   const qr = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&bgcolor=e8e4db&color=08090b&data=" + encodeURIComponent(share);
-  const logo = (typeof ATHAR_LOGO === "string" && ATHAR_LOGO) ? ATHAR_LOGO : "/logo-athar.png";
   const words = data.items.map((item, i) => {
     const pos = orbit(item.id, i);
     if (!pos.visible) return "";
@@ -143,7 +142,7 @@ function wallView(copy) {
   }).join("");
   const rings = [0,1,2,3,4].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.8}s" />`).join("");
   return `<main class="page"><svg class="ripple" aria-hidden="true">${rings}</svg>${words}
-    <header class="top"><img src="${logo}" alt="أثر" width="68" height="68" style="width:4.25rem;height:4.25rem;object-fit:contain" />
+    <header class="top"><img src="/logo-athar.svg" alt="أثر" width="68" height="68" style="width:4.25rem;height:4.25rem;object-fit:contain" />
     <div style="text-align:end"><button class="lang" id="lang">${copy.langSwitch}</button>
     <p class="muted" style="font-size:.9rem"><span style="color:var(--fg)">${fmt(data.count)}</span> ${esc(copy.planted)}</p>
     <a href="/all" data-go="/all" class="muted" style="font-size:.75rem;text-decoration:underline">${esc(copy.viewAll)}</a></div></header>
