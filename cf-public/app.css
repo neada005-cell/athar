@@ -28,6 +28,8 @@ a { color: inherit; text-decoration: none; }
 .ripple {
   position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none;
+  -webkit-mask-image: radial-gradient(ellipse 58% 48% at 50% 44%, #000 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 58% 48% at 50% 44%, #000 55%, transparent 100%);
 }
 .ripple circle {
   fill: none; stroke: var(--fg); stroke-width: 1;
@@ -36,7 +38,7 @@ a { color: inherit; text-decoration: none; }
 }
 @keyframes ripple-out {
   from { transform: scale(0.08); opacity: 0.28; }
-  to { transform: scale(1.05); opacity: 0; }
+  to { transform: scale(0.78); opacity: 0; }
 }
 .orbit {
   position: absolute; z-index: 10; max-width: 11rem; margin: 0;
@@ -71,15 +73,15 @@ a { color: inherit; text-decoration: none; }
 .btn:disabled { opacity: 0.4; }
 .lang { background: none; border: 0; color: var(--muted); font-size: 0.75rem; padding: 0.5rem 0.75rem; }
 .stack {
-  position: absolute; right: 1.25rem; bottom: max(1.25rem, env(safe-area-inset-bottom));
+  position: absolute; right: 1rem; bottom: max(1rem, env(safe-area-inset-bottom));
   display: flex; flex-direction: column; gap: 0.5rem; pointer-events: auto;
 }
 .qr {
-  position: absolute; left: 1.25rem; bottom: max(1.25rem, env(safe-area-inset-bottom));
-  width: 7rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  position: absolute; left: 0.75rem; bottom: max(0.75rem, env(safe-area-inset-bottom));
+  width: 5.25rem; display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
   pointer-events: none;
 }
-.qr img { width: 6rem; height: 6rem; background: var(--accent); border-radius: 8px; padding: 0.4rem; }
+.qr img { width: 4.25rem; height: 4.25rem; background: var(--accent); border-radius: 8px; padding: 0.3rem; }
 .qr span { font-size: 0.75rem; color: var(--muted); text-align: center; direction: rtl; }
 .flow { max-width: 28rem; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; justify-content: space-between; padding: 2.5rem 1.5rem; }
 .display { font-family: var(--display); }
