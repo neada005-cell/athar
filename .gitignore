@@ -1,0 +1,10 @@
+node_modules
+.vercel
+.output
+.nitro
+.env
+.env.*
+*.log
+screenshots
+athar-club.tar.gz
+.grok/preview.log
