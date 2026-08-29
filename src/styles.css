@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #08090b;
+  --color-bg-elevated: #121318;
+  --color-fg: #f2efe8;
+  --color-muted: #9a958c;
+  --color-subtle: #6e6a63;
+  --color-accent: #e8e4db;
+  --color-accent-fg: #0c0d10;
+  --color-border: #2a2b32;
+  --color-ring: #c8c4bc;
+  --font-sans: "IBM Plex Sans Arabic", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Amiri", "Times New Roman", serif;
+}
+
+@layer base {
+  html, body, #app {
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+  }
+  body { font-family: var(--font-sans); line-height: 1.5; }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+}
+
+.hero-mark {
+  font-family: var(--font-display);
+  font-size: clamp(4.25rem, 16vw, 10rem);
+  line-height: 0.9;
+  font-weight: 700;
+}
+.ripple-ring {
+  fill: none; stroke: var(--color-fg); stroke-width: 1;
+  transform-origin: 50% 46%; transform-box: view-box;
+  animation: ripple-out 9s linear infinite;
+}
+.ripple-burst {
+  fill: none; stroke: var(--color-fg); stroke-width: 1.4;
+  transform-origin: center; transform-box: fill-box;
+  animation: burst-out 1.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes ripple-out {
+  from { transform: scale(0.08); opacity: 0.28; }
+  to { transform: scale(1.05); opacity: 0; }
+}
+@keyframes burst-out {
+  from { transform: scale(0.2); opacity: 0.55; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+.orbit-word {
+  position: absolute; z-index: 10; max-width: 11rem; margin: 0;
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; text-align: center; line-height: 1.35;
+  pointer-events: none; color: var(--color-fg); font-weight: 500;
+}
+.orbit-word-full { max-width: 16rem; overflow: visible; -webkit-line-clamp: unset; display: block; }
+.z-15 { z-index: 15; }
+.breathe { animation: breathe 6.4s cubic-bezier(0.22, 1, 0.36, 1) infinite; }
+.rise-in { animation: rise-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ring-fill { stroke-dasharray: 283; stroke-dashoffset: 283; animation: ring-fill 5s linear forwards; }
+.safe-bottom { padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); }
+.wall-wash {
+  background: radial-gradient(ellipse 70% 55% at 50% 46%, color-mix(in oklab, var(--color-fg) 7%, var(--color-bg)) 0%, var(--color-bg) 72%);
+}
+@keyframes breathe {
+  0%, 100% { opacity: 0.88; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.012); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ring-fill { to { stroke-dashoffset: 0; } }
