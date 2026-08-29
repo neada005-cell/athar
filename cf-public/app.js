@@ -36,7 +36,6 @@ const dict = {
     inspireRest: "It disappeared, but the ripples it created kept spreading. Your impact may be the same; you may never see how far it reaches, but that doesn’t mean it has stopped.",
   },
 };
-
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 function orbit(id, age) {
   const angle = id * GOLDEN;
@@ -50,7 +49,6 @@ function orbit(id, age) {
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
 function go(p) { history.pushState({}, "", p); render(); }
 window.addEventListener("popstate", render);
-
 let lang = localStorage.getItem("athar-lang") === "en" ? "en" : "ar";
 let data = { items: [], count: 0 };
 let phase = "intro";
@@ -60,7 +58,6 @@ let busy = false;
 let saved = "";
 let showSkip = false;
 let skipTimer, darkTimer;
-
 function t() { return dict[lang]; }
 function fmt(n) { return n.toLocaleString(lang === "ar" ? "ar-SA" : "en-US"); }
 function applyDir() {
@@ -73,7 +70,6 @@ function esc(s) {
   const map = { "&": "&" + "amp;", "<": "&" + "lt;", ">": "&" + "gt;", '"': "&" + "quot;" };
   return String(s).replace(/[&<>"]/g, (c) => map[c]);
 }
-
 async function load() {
   try {
     const res = await fetch("/api/impacts");
@@ -138,6 +134,7 @@ function bindShare() {
 function wallView(copy) {
   const share = location.origin + "/share";
   const qr = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&bgcolor=e8e4db&color=08090b&data=" + encodeURIComponent(share);
+  const logo = (typeof ATHAR_LOGO === "string" && ATHAR_LOGO) ? ATHAR_LOGO : "/logo-athar.png";
   const words = data.items.map((item, i) => {
     const pos = orbit(item.id, i);
     if (!pos.visible) return "";
@@ -146,7 +143,7 @@ function wallView(copy) {
   }).join("");
   const rings = [0,1,2,3,4].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.8}s" />`).join("");
   return `<main class="page"><svg class="ripple" aria-hidden="true">${rings}</svg>${words}
-    <header class="top"><div><p class="muted" style="font-size:.75rem">${esc(copy.club)}</p><p style="margin:.25rem 0 0;font-size:.9rem">${esc(copy.fair)}</p></div>
+    <header class="top"><img src="${logo}" alt="أثر" width="68" height="68" style="width:4.25rem;height:4.25rem;object-fit:contain" />
     <div style="text-align:end"><button class="lang" id="lang">${copy.langSwitch}</button>
     <p class="muted" style="font-size:.9rem"><span style="color:var(--fg)">${fmt(data.count)}</span> ${esc(copy.planted)}</p>
     <a href="/all" data-go="/all" class="muted" style="font-size:.75rem;text-decoration:underline">${esc(copy.viewAll)}</a></div></header>
