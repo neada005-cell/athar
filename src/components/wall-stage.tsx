@@ -55,10 +55,7 @@ export function WallStage({ initial }: { initial: ImpactList }) {
         <OrbitWord key={item.id} item={item} age={index} />
       ))}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-5 py-5 sm:px-8 sm:py-7">
-        <div>
-          <p className="text-xs tracking-wide text-muted">{t.club}</p>
-          <p className="mt-1 text-sm text-fg/80">{t.fair}</p>
-        </div>
+        <img src="/logo-athar.png" alt="أثر" className="h-[4.25rem] w-[4.25rem] object-contain sm:h-20 sm:w-20" />
         <div className="pointer-events-auto flex flex-col items-end gap-3">
           <button type="button" onClick={toggle} className="rounded-sm px-3 py-2 text-xs tracking-wide text-muted hover:text-fg">
             {t.langSwitch}
