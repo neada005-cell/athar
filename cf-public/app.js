@@ -6,7 +6,7 @@ const dict = {
     introTitle: ["خمس ثواني.", "سؤال واحد.", "أثر يبقى."],
     introBody: "اللحظة على جوالك، وبعدها أثرك يظهر على الجدار قدام الكل.",
     enter: "ادخل اللحظة", think: "فكّر. لا تكتب للحين.", skip: "تخطى",
-    writeTitle: "أكتب أثرُك في جملة", writeHint: "بدون اسم. يظهر على الجدار.",
+    writeTitle: "أكتب أثرُك في جملة", writeHint: "أكثر من أربع كلمات لن تظهر كاملة على الجدار",
     writePlaceholder: "أخلي أحد يحس إنه قادر", plant: "اغرس الأثر",
     planting: "ينغرس...", tooShort: "اكتب جملة قصيرة.",
     saveFail: "ما قدرنا نحفظ الأثر.", doneTitle: "أثرُك انغرس.",
@@ -24,7 +24,7 @@ const dict = {
     introTitle: ["Five seconds.", "One question.", "An impact that stays."],
     introBody: "The moment is on your phone — then it appears on the wall.",
     enter: "Enter the moment", think: "Think. Don't write yet.", skip: "Skip",
-    writeTitle: "Write your impact in one line", writeHint: "No name. It shows on the wall.",
+    writeTitle: "Write your impact in one line", writeHint: "More than four words will not appear fully on the wall",
     writePlaceholder: "I help someone believe they can", plant: "Plant it",
     planting: "Planting...", tooShort: "Write a short sentence.",
     saveFail: "Could not save your impact.", doneTitle: "Your impact is on the wall.",
@@ -137,7 +137,7 @@ function wallView(copy) {
   const words = data.items.map((item, i) => {
     const pos = orbit(item.id, i);
     if (!pos.visible) return "";
-    const full = item.text.trim().split(/\s+/).length <= 3 ? " full" : "";
+    const full = item.text.trim().split(/\s+/).length <= 4 ? " full" : "";
     return `<p class="orbit${full}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.62+pos.scale*0.38).toFixed(2)}rem">${esc(item.text)}</p>`;
   }).join("");
   const rings = [0,1,2,3,4].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.8}s" />`).join("");
@@ -185,7 +185,7 @@ function shareView(copy) {
       <h1 class="display" style="font-size:2rem">${esc(copy.writeTitle)}</h1></div>
       <div><textarea id="draft" maxlength="80" placeholder="${esc(copy.writePlaceholder)}">${esc(draft)}</textarea>
       <div class="muted" style="display:flex;justify-content:space-between;font-size:.75rem;margin-top:.5rem">
-      <span>${esc(error)}</span><span>${draft.length}/80</span></div></div>
+      <span>${esc(error || copy.writeHint)}</span><span>${draft.length}/80</span></div></div>
       <button class="btn solid wide" id="plant" ${busy ? "disabled" : ""}>${esc(busy ? copy.planting : copy.plant)}</button></main>`;
   }
   return `<main class="flow" style="text-align:center"><p class="muted" style="font-size:.75rem">${esc(copy.club)}</p>
