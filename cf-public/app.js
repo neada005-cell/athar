@@ -51,6 +51,10 @@ function layout(items) {
   const used = new Set();
   return items.map((item, age) => {
     if (age >= SLOTS.length) return { x: 0.5, y: 0.51, visible: false };
+    if (item.slot != null && item.slot >= 0 && item.slot < SLOTS.length && !used.has(item.slot)) {
+      used.add(item.slot);
+      return SLOTS[item.slot];
+    }
     const start = hashId(item.id) % SLOTS.length;
     let idx = start;
     for (let n = 0; n < SLOTS.length; n++) {
@@ -86,16 +90,40 @@ function esc(s) {
   const map = { "&": "&" + "amp;", "<": "&" + "lt;", ">": "&" + "gt;", '"': "&" + "quot;" };
   return String(s).replace(/[&<>"]/g, (c) => map[c]);
 }
+function recalled() {
+  try { return JSON.parse(localStorage.getItem("athar-wall") || "null"); }
+  catch { return null; }
+}
+function remember(items, count) {
+  try { localStorage.setItem("athar-wall", JSON.stringify({ items: items.slice(0, 200), count })); }
+  catch (e) { /* quota */ }
+}
 async function load() {
+  const local = recalled();
+  if (local && local.items && local.items.length && !data.items.length) {
+    data = { items: local.items, count: local.count || local.items.length };
+  }
   try {
-    const res = await fetch("/api/impacts");
+    const res = await fetch("/api/impacts", { cache: "no-store" });
     const raw = await res.json();
-    const items = (raw.items || []).map((it, i) => ({
+    const serverItems = (raw.items || []).map((it, i) => ({
       id: Number(it.id) || i + 1,
       text: it.text || it.body || "",
+      slot: it.slot,
     }));
-    data = { items, count: Number(raw.count) || items.length };
-  } catch (e) { /* keep */ }
+    const map = new Map();
+    for (const it of (local && local.items) || []) map.set(Number(it.id), it);
+    for (const it of data.items) map.set(Number(it.id), it);
+    for (const it of serverItems) map.set(Number(it.id), it);
+    const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
+    const count = Math.max(Number(raw.count) || 0, items.length);
+    data = { items, count };
+    remember(items, count);
+  } catch (e) {
+    if (local && local.items && local.items.length) {
+      data = { items: local.items, count: local.count || local.items.length };
+    }
+  }
 }
 async function plant() {
   const body = draft.replace(/\s+/g, " ").trim();
