@@ -1,6 +1,6 @@
 const dict = {
   ar: {
-    club: "نادي أثر", fair: "ملتقى الأندية", planted: "أثر انغرس",
+    club: "نادي أثر", planted: "أثر انغرس",
     question: "ما الأثر الذي تريد تركه؟", writeMine: "أكتب أثرك",
     scan: "امسح واترك أثرك", langSwitch: "EN",
     introTitle: ["خمس ثواني.", "سؤال واحد.", "أثر يبقى."],
@@ -51,8 +51,8 @@ function makeSlots() {
 }
 const SLOTS = makeSlots();
 function stageOf(age) {
-  if (age <= 2) return { size: 1.14, color: "#e8e4db", opacity: 1, visible: true };
-  if (age <= 5) return { size: 0.94, color: "#c9b89a", opacity: 0.9, visible: true };
+  if (age <= 2) return { size: 1.18, color: age % 2 === 0 ? "#f4f1ea" : "#d2c4a8", opacity: 1, visible: true };
+  if (age <= 5) return { size: 0.95, color: age % 2 === 0 ? "#e8e0d2" : "#c4b49a", opacity: 0.92, visible: true };
   if (age <= 8) return { size: 0.76, color: "#8c8780", opacity: 0.55, visible: true };
   if (age <= 11) return { size: 0.62, color: "#5c5954", opacity: 0.3, visible: true };
   return { size: 0.5, color: "#5c5954", opacity: 0, visible: false };
@@ -124,37 +124,19 @@ function esc(s) {
   const map = { "&": "&" + "amp;", "<": "&" + "lt;", ">": "&" + "gt;", '"': "&" + "quot;" };
   return String(s).replace(/[&<>"]/g, (c) => map[c]);
 }
-function recalled() {
-  try { return JSON.parse(localStorage.getItem("athar-wall") || "null"); }
-  catch { return null; }
-}
-function remember(items, count) {
-  try { localStorage.setItem("athar-wall", JSON.stringify({ items: items.slice(0, 200), count })); }
-  catch (e) {}
-}
 async function load() {
-  const local = recalled();
-  if (local && local.items && local.items.length && !data.items.length) {
-    data = { items: local.items, count: local.count || local.items.length };
-  }
   try {
     const res = await fetch("/api/impacts", { cache: "no-store" });
     const raw = await res.json();
-    const serverItems = (raw.items || []).map((it, i) => ({
-      id: Number(it.id) || i + 1, text: it.text || it.body || "", slot: it.slot,
-    }));
-    const map = new Map();
-    for (const it of (local && local.items) || []) map.set(Number(it.id), it);
-    for (const it of data.items) map.set(Number(it.id), it);
-    for (const it of serverItems) map.set(Number(it.id), it);
-    const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
-    data = { items, count: Math.max(Number(raw.count) || 0, items.length) };
-    remember(items, data.count);
-  } catch (e) {
-    if (local && local.items && local.items.length) {
-      data = { items: local.items, count: local.count || local.items.length };
-    }
-  }
+    data = {
+      items: (raw.items || []).map((it, i) => ({
+        id: Number(it.id) || i + 1,
+        text: it.text || it.body || "",
+        slot: it.slot,
+      })),
+      count: Number(raw.count) || (raw.items || []).length,
+    };
+  } catch (e) {}
 }
 async function plant() {
   const body = draft.replace(/\s+/g, " ").trim();
@@ -165,10 +147,6 @@ async function plant() {
     if (!res.ok) throw new Error("fail");
     const row = await res.json();
     saved = row.text || row.body || body;
-    if (row.slot != null) {
-      data.items = [{ id: Number(row.id) || Date.now(), text: saved, slot: row.slot }, ...data.items];
-      data.count += 1;
-    }
     phase = "done";
     await load();
   } catch (e) { error = t().saveFail; }
