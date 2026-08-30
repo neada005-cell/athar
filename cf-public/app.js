@@ -36,35 +36,23 @@ const dict = {
     inspireRest: "It disappeared, but the ripples it created kept spreading. Your impact may be the same; you may never see how far it reaches, but that doesn’t mean it has stopped.",
   },
 };
-const RINGS = [
-  { r: 0.37, n: 5, scale: 1, opacity: 1, spin: 0.5 },
-  { r: 0.275, n: 4, scale: 0.76, opacity: 0.8, spin: 0.25 },
-  { r: 0.21, n: 3, scale: 0.56, opacity: 0.58, spin: 0.08 },
-];
-function orbitSlots() {
-  const slots = [];
-  for (const ring of RINGS) {
-    for (let i = 0; i < ring.n; i++) {
-      slots.push({
-        angle: -Math.PI / 2 + ((i + ring.spin) / ring.n) * Math.PI * 2,
-        r: ring.r, scale: ring.scale, opacity: ring.opacity,
-      });
-    }
-  }
-  return slots;
+function polar(deg, rx, ry, scale, opacity) {
+  const a = (deg * Math.PI) / 180;
+  return { x: 0.5 + Math.cos(a) * rx, y: 0.51 + Math.sin(a) * ry, scale, opacity, visible: true };
 }
-const SLOTS = orbitSlots();
+const SLOTS = [
+  polar(-90, 0.34, 0.23, 1, 1),
+  polar(-30, 0.34, 0.23, 1, 1),
+  polar(30, 0.34, 0.23, 1, 1),
+  polar(90, 0.34, 0.23, 1, 1),
+  polar(150, 0.34, 0.23, 1, 1),
+  polar(210, 0.34, 0.23, 1, 1),
+  polar(0, 0.2, 0.135, 0.78, 0.84),
+  polar(120, 0.2, 0.135, 0.78, 0.84),
+  polar(240, 0.2, 0.135, 0.78, 0.84),
+];
 function orbit(_id, age) {
-  const slot = SLOTS[age];
-  if (!slot) return { x: 0.5, y: 0.46, scale: 0.2, opacity: 0, visible: false };
-  const w = window.innerWidth || 390;
-  const h = window.innerHeight || 844;
-  const min = Math.min(w, h);
-  return {
-    x: 0.5 + Math.cos(slot.angle) * (slot.r * min / w),
-    y: 0.45 + Math.sin(slot.angle) * (slot.r * min / h),
-    scale: slot.scale, opacity: slot.opacity, visible: true,
-  };
+  return SLOTS[age] || { x: 0.5, y: 0.51, scale: 0.2, opacity: 0, visible: false };
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
 function go(p) {
@@ -157,7 +145,7 @@ function wordHtml() {
     const pos = orbit(item.id, i);
     if (!pos.visible) return "";
     const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
-    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.7+pos.scale*0.5).toFixed(2)}rem;transform:translate(-50%,-50%) scale(${pos.scale.toFixed(3)})">${esc(item.text || "")}</p>`;
+    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.88+pos.scale*0.28).toFixed(2)}rem;transform:translate(-50%,-50%) scale(${pos.scale.toFixed(3)})">${esc(item.text || "")}</p>`;
   }).join("");
 }
 function setText(id, text) {
@@ -179,18 +167,24 @@ function patchOrbits() {
     }
     const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
     let el = layer.querySelector('[data-id="' + key + '"]');
+    const left = (pos.x * 100).toFixed(2) + "%";
+    const top = (pos.y * 100).toFixed(2) + "%";
+    const size = (0.88 + pos.scale * 0.28).toFixed(2) + "rem";
+    const tf = "translate(-50%,-50%) scale(" + pos.scale.toFixed(3) + ")";
     if (!el) {
       el = document.createElement("p");
       el.className = "orbit" + full;
       el.dataset.id = key;
       el.textContent = item.text || "";
+      el.style.transition = "none";
+      el.style.left = left; el.style.top = top; el.style.opacity = String(pos.opacity);
+      el.style.fontSize = size; el.style.transform = tf;
       layer.appendChild(el);
+      requestAnimationFrame(function () { el.style.transition = ""; });
+      return;
     }
-    el.style.left = (pos.x * 100).toFixed(2) + "%";
-    el.style.top = (pos.y * 100).toFixed(2) + "%";
-    el.style.opacity = String(pos.opacity);
-    el.style.fontSize = (0.7 + pos.scale * 0.5).toFixed(2) + "rem";
-    el.style.transform = "translate(-50%,-50%) scale(" + pos.scale.toFixed(3) + ")";
+    el.style.left = left; el.style.top = top; el.style.opacity = String(pos.opacity);
+    el.style.fontSize = size; el.style.transform = tf;
   });
   [...layer.children].forEach((el) => {
     if (!seen.has(el.getAttribute("data-id"))) el.remove();
@@ -206,8 +200,6 @@ function patchWall(copy) {
   setText("scan", copy.scan);
   setText("inspire-btn", copy.inspire);
   setText("write-btn", copy.writeMine);
-  const q = document.getElementById("question");
-  if (q) q.style.display = data.items.length ? "none" : "";
 }
 function bindNav() {
   document.querySelectorAll("[data-go]").forEach((el) => {
@@ -232,14 +224,14 @@ function bindShare() {
 function wallView(copy) {
   const share = location.origin + "/share";
   const qr = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&bgcolor=e8e4db&color=08090b&data=" + encodeURIComponent(share);
-  const rings = [0,1,2,3,4,5,6].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.4}s" />`).join("");
-  const qHide = data.items.length ? ";display:none" : "";
+  const rings = [0,1,2,3,4,5,6].map((i) => `<circle cx="50%" cy="51%" r="42%" style="animation-delay:${i*-1.4}s" />`).join("");
   return `<main class="page"><svg class="ripple" aria-hidden="true">${rings}</svg><div id="orbits">${wordHtml()}</div>
     <header class="top"><img src="/logo-athar.svg" alt="أثر" width="68" height="68" style="width:4.25rem;height:4.25rem;object-fit:contain" />
     <div style="text-align:end"><button class="lang" id="lang">${copy.langSwitch}</button>
     <p class="muted" style="font-size:.9rem"><span id="count" style="color:var(--fg)">${fmt(data.count)}</span> <span id="planted-label">${esc(copy.planted)}</span></p>
     <a href="/all" data-go="/all" class="muted" id="view-all" style="font-size:.75rem;text-decoration:underline">${esc(copy.viewAll)}</a></div></header>
-    <div class="center"><p class="hero">أثر</p><p class="muted" id="question" style="margin-top:1.25rem;max-width:24rem${qHide}">${esc(copy.question)}</p></div>
+    <p class="ask" id="question">${esc(copy.question)}</p>
+    <div class="center"><p class="hero">أثر</p></div>
     <div class="bottom"><figure class="qr"><img src="${qr}" alt="QR" width="96" height="96" /><span id="scan">${esc(copy.scan)}</span></figure>
     <div class="stack"><a class="btn line" href="/inspire" data-go="/inspire" id="inspire-btn">${esc(copy.inspire)}</a>
     <a class="btn solid" href="/share" data-go="/share" id="write-btn">${esc(copy.writeMine)}</a></div></div></main>`;
