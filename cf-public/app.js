@@ -124,8 +124,11 @@ function mergePayload(raw) {
 async function load() {
   try {
     const res = await fetch("/api/impacts?t=" + Date.now(), { cache: "no-store" });
+    if (!res.ok) return;
     const raw = await res.json();
-    if ((raw.items || []).length) mergePayload(raw);
+    if (!Array.isArray(raw.items)) return;
+    if (!raw.items.length) { data = { items: [], count: 0 }; return; }
+    mergePayload(raw);
   } catch (e) {}
 }
 async function plant() {
