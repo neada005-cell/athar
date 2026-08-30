@@ -8,6 +8,7 @@ function cors() {
 }
 
 const ORBIT_LIMIT = 12;
+const MAX_ITEMS = 500;
 
 function makeSlots() {
   const out = [];
@@ -75,37 +76,41 @@ export class Wall {
     this.state = state;
   }
 
-  async fetch(request) {
-    const items = (await this.state.storage.get("items")) || [];
+  json(data, status) {
+    return Response.json(data, { status: status || 200, headers: cors() });
+  }
 
+  async fetch(request) {
     if (request.method === "GET") {
-      return Response.json(
-        { items, count: items.length },
-        { headers: { ...cors(), "Cache-Control": "no-store, no-cache" } },
-      );
+      const items = (await this.state.storage.get("items")) || [];
+      const count = (await this.state.storage.get("count")) || items.length;
+      return this.json({ items, count });
     }
 
     if (request.method === "POST") {
       let body = "";
-      let data = {};
       try {
-        data = await request.json();
+        const data = await request.json();
         body = String(data.body || "").replace(/\s+/g, " ").trim();
       } catch {
-        return Response.json({ error: "bad" }, { status: 400, headers: cors() });
+        return this.json({ error: "bad" }, 400);
       }
       if (body.length < 2 || body.length > 80) {
-        return Response.json({ error: "short" }, { status: 400, headers: cors() });
+        return this.json({ error: "short" }, 400);
       }
+
+      const items = (await this.state.storage.get("items")) || [];
+      const seq = ((await this.state.storage.get("seq")) || 0) + 1;
+      const count = ((await this.state.storage.get("count")) || items.length) + 1;
       const row = {
-        id: Date.now(),
+        id: seq,
         text: body,
         slot: nextSlot(items),
         createdAt: new Date().toISOString(),
       };
-      const next = [row, ...items].slice(0, 500);
-      await this.state.storage.put("items", next);
-      return Response.json(row, { headers: cors() });
+      const next = [row, ...items].slice(0, MAX_ITEMS);
+      await this.state.storage.put({ seq: seq, count: count, items: next });
+      return this.json(row);
     }
 
     return new Response("Method Not Allowed", { status: 405, headers: cors() });
