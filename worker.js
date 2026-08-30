@@ -3,6 +3,7 @@ function cors() {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
+    "Cache-Control": "no-store, no-cache",
   };
 }
 
@@ -78,7 +79,10 @@ export class Wall {
     const items = (await this.state.storage.get("items")) || [];
 
     if (request.method === "GET") {
-      return Response.json({ items, count: items.length }, { headers: cors() });
+      return Response.json(
+        { items, count: items.length },
+        { headers: { ...cors(), "Cache-Control": "no-store, no-cache" } },
+      );
     }
 
     if (request.method === "POST") {
@@ -93,16 +97,11 @@ export class Wall {
       if (body.length < 2 || body.length > 80) {
         return Response.json({ error: "short" }, { status: 400, headers: cors() });
       }
-      const incomingId = Number(data.id) || 0;
-      const existing = incomingId ? items.find((it) => Number(it.id) === incomingId) : null;
-      if (existing) {
-        return Response.json(existing, { headers: cors() });
-      }
       const row = {
-        id: incomingId || Date.now(),
+        id: Date.now(),
         text: body,
-        slot: data.slot != null ? Number(data.slot) : nextSlot(items),
-        createdAt: data.createdAt || new Date().toISOString(),
+        slot: nextSlot(items),
+        createdAt: new Date().toISOString(),
       };
       const next = [row, ...items].slice(0, 500);
       await this.state.storage.put("items", next);
