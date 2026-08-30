@@ -115,31 +115,47 @@ function mergePayload(raw) {
   const incoming = (raw.items || []).map((it, i) => ({ id: Number(it.id) || Date.now() + i, text: it.text || it.body || "", slot: it.slot }));
   const map = new Map();
   data.items.forEach((it) => map.set(String(it.id), it));
-  incoming.forEach((it) => map.set(String(it.id), it));
+  let added = 0;
+  incoming.forEach((it) => { const key = String(it.id); if (!map.has(key)) added += 1; map.set(key, it); });
   const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
-  if (!items.length) return;
+  if (!items.length) return 0;
   data = { items: items, count: Math.max(Number(raw.count) || 0, items.length, data.count) };
+  return added;
 }
-async function load() {
+const PN_CH = "athar-neada005-wall";
+const PN_UUID = "athar-" + Math.random().toString(36).slice(2, 10);
+let pnTT = "0";
+let pubTimer;
+function snapshot() { return { items: data.items.slice(0, 80), count: data.count }; }
+async function publishWall() {
   try {
-    const res = await fetch("/api/impacts", { cache: "no-store" });
-    const raw = await res.json();
-    if ((raw.items || []).length) mergePayload(raw);
+    await fetch("https://ps.pndsn.com/publish/demo/demo/0/" + PN_CH + "/0", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(snapshot()),
+    });
   } catch (e) {}
 }
-const TOPIC = "athar/neada005/wall";
-let bus;
-function publishWall() {
-  if (!bus || !bus.connected) return;
-  try { bus.publish(TOPIC, JSON.stringify({ items: data.items, count: data.count }), { retain: true, qos: 1 }); } catch (e) {}
+function schedulePublish() { clearTimeout(pubTimer); pubTimer = setTimeout(publishWall, 250); }
+async function load() {
+  try {
+    const res = await fetch("https://ps.pndsn.com/v2/history/sub-key/demo/channel/" + PN_CH + "?count=1");
+    const json = await res.json();
+    const msgs = json[0] || [];
+    const last = msgs[msgs.length - 1];
+    if (last && last.items) mergePayload(last);
+  } catch (e) {}
 }
-function live() {
-  if (typeof mqtt === "undefined") return;
-  try { bus = mqtt.connect("wss://broker.emqx.io:8084/mqtt", { reconnectPeriod: 1500, clean: true }); } catch (e) { return; }
-  bus.on("connect", () => { try { bus.subscribe(TOPIC, { qos: 1 }); } catch (e) {} });
-  bus.on("message", function (_t, buf) {
-    try { mergePayload(JSON.parse(buf.toString())); render(); } catch (err) {}
-  });
+async function live() {
+  while (true) {
+    try {
+      const res = await fetch("https://ps.pndsn.com/subscribe/demo/" + PN_CH + "/0/" + pnTT + "?uuid=" + encodeURIComponent(PN_UUID));
+      const json = await res.json();
+      pnTT = String(json[1] || pnTT);
+      const msgs = json[0] || [];
+      let added = 0;
+      msgs.forEach((m) => { if (m && m.items) added += mergePayload(m); });
+      if (msgs.length) { render(); if (added) schedulePublish(); }
+    } catch (e) { await new Promise((r) => setTimeout(r, 1200)); }
+  }
 }
 async function plant() {
   const body = draft.replace(/\s+/g, " ").trim();
@@ -152,12 +168,9 @@ async function plant() {
     createdAt: new Date().toISOString(),
   };
   mergePayload({ items: [row, ...data.items], count: data.count + 1 });
-  saved = body;
-  phase = "done";
-  publishWall();
-  try {
-    await fetch("/api/impacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }) });
-  } catch (e) {}
+  saved = body; phase = "done";
+  await publishWall();
+  try { await fetch("/api/impacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }) }); } catch (e) {}
   busy = false; render();
 }
 function startDark() {
@@ -348,4 +361,3 @@ function shareView(copy) {
 applyDir();
 load().then(render);
 live();
-setInterval(() => { if (path() === "/" || path() === "/all") load().then(render); }, 2000);
