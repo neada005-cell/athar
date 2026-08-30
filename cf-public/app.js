@@ -170,8 +170,7 @@ function allView(copy) {
 function shareView(copy) {
   if (phase === "intro") {
     return `<main class="flow"><div style="display:flex;justify-content:space-between"><p class="muted" style="font-size:.75rem">${esc(copy.club)}</p><button class="lang" id="lang">${copy.langSwitch}</button></div>
-      <div><h1 class="display" style="font-size:2.4rem;line-height:1.15">${esc(copy.introTitle[0])}<br>${esc(copy.introTitle[1])}<br>${esc(copy.introTitle[2])}</h1>
-      <p class="muted" style="margin-top:1.25rem">${esc(copy.introBody)}</p></div>
+      <div><h1 class="display" style="font-size:2.4rem;line-height:1.15">${esc(copy.introTitle[0])}<br>${esc(copy.introTitle[1])}<br>${esc(copy.introTitle[2])}</h1></div>
       <button class="btn solid wide" id="enter">${esc(copy.enter)}</button></main>`;
   }
   if (phase === "dark") {
