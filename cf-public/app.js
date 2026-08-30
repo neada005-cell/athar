@@ -143,8 +143,36 @@ function render() {
   if (p === "/inspire") { app.innerHTML = inspireView(copy); bindNav(); return; }
   if (p === "/all") { app.innerHTML = allView(copy); bindNav(); return; }
   if (p === "/share") { app.innerHTML = shareView(copy); bindShare(); return; }
+  if (app.querySelector(".ripple")) {
+    patchWall(copy);
+    return;
+  }
   app.innerHTML = wallView(copy);
   bindNav();
+}
+function wordHtml() {
+  return data.items.map((item, i) => {
+    const pos = orbit(item.id, i);
+    if (!pos.visible) return "";
+    const full = item.text.trim().split(/\s+/).length <= 4 ? " full" : "";
+    return `<p class="orbit${full}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.62+pos.scale*0.38).toFixed(2)}rem">${esc(item.text)}</p>`;
+  }).join("");
+}
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+function patchWall(copy) {
+  const layer = document.getElementById("orbits");
+  if (layer) layer.innerHTML = wordHtml();
+  setText("count", fmt(data.count));
+  setText("lang", copy.langSwitch);
+  setText("planted-label", copy.planted);
+  setText("view-all", copy.viewAll);
+  setText("question", copy.question);
+  setText("scan", copy.scan);
+  setText("inspire-btn", copy.inspire);
+  setText("write-btn", copy.writeMine);
 }
 function bindNav() {
   document.querySelectorAll("[data-go]").forEach((el) => {
@@ -169,22 +197,16 @@ function bindShare() {
 function wallView(copy) {
   const share = location.origin + "/share";
   const qr = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&bgcolor=e8e4db&color=08090b&data=" + encodeURIComponent(share);
-  const words = data.items.map((item, i) => {
-    const pos = orbit(item.id, i);
-    if (!pos.visible) return "";
-    const full = item.text.trim().split(/\s+/).length <= 4 ? " full" : "";
-    return `<p class="orbit${full}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.62+pos.scale*0.38).toFixed(2)}rem">${esc(item.text)}</p>`;
-  }).join("");
-  const rings = [0,1,2,3,4].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.8}s" />`).join("");
-  return `<main class="page"><svg class="ripple" aria-hidden="true">${rings}</svg>${words}
+  const rings = [0,1,2,3,4,5,6].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.4}s" />`).join("");
+  return `<main class="page"><svg class="ripple" aria-hidden="true">${rings}</svg><div id="orbits">${wordHtml()}</div>
     <header class="top"><img src="/logo-athar.svg" alt="أثر" width="68" height="68" style="width:4.25rem;height:4.25rem;object-fit:contain" />
     <div style="text-align:end"><button class="lang" id="lang">${copy.langSwitch}</button>
-    <p class="muted" style="font-size:.9rem"><span style="color:var(--fg)">${fmt(data.count)}</span> ${esc(copy.planted)}</p>
-    <a href="/all" data-go="/all" class="muted" style="font-size:.75rem;text-decoration:underline">${esc(copy.viewAll)}</a></div></header>
-    <div class="center"><p class="hero">أثر</p><p class="muted" style="margin-top:1.25rem;max-width:24rem">${esc(copy.question)}</p></div>
-    <div class="bottom"><figure class="qr"><img src="${qr}" alt="QR" width="96" height="96" /><span>${esc(copy.scan)}</span></figure>
-    <div class="stack"><a class="btn line" href="/inspire" data-go="/inspire">${esc(copy.inspire)}</a>
-    <a class="btn solid" href="/share" data-go="/share">${esc(copy.writeMine)}</a></div></div></main>`;
+    <p class="muted" style="font-size:.9rem"><span id="count" style="color:var(--fg)">${fmt(data.count)}</span> <span id="planted-label">${esc(copy.planted)}</span></p>
+    <a href="/all" data-go="/all" class="muted" id="view-all" style="font-size:.75rem;text-decoration:underline">${esc(copy.viewAll)}</a></div></header>
+    <div class="center"><p class="hero">أثر</p><p class="muted" id="question" style="margin-top:1.25rem;max-width:24rem">${esc(copy.question)}</p></div>
+    <div class="bottom"><figure class="qr"><img src="${qr}" alt="QR" width="96" height="96" /><span id="scan">${esc(copy.scan)}</span></figure>
+    <div class="stack"><a class="btn line" href="/inspire" data-go="/inspire" id="inspire-btn">${esc(copy.inspire)}</a>
+    <a class="btn solid" href="/share" data-go="/share" id="write-btn">${esc(copy.writeMine)}</a></div></div></main>`;
 }
 function inspireView(copy) {
   return `<main class="page"><header class="top"><button class="lang" id="lang">${copy.langSwitch}</button>
