@@ -7,54 +7,35 @@ function cors() {
   };
 }
 
-const ORBIT_LIMIT = 12;
+const ORBIT_LIMIT = 18;
 const MAX_ITEMS = 500;
+const ANGLES = Array.from({ length: ORBIT_LIMIT }, (_, i) => -90 + (360 / ORBIT_LIMIT) * i + ((i % 3) - 1) * 5);
 
-function makeSlots() {
-  const out = [];
-  for (let i = 0; i < ORBIT_LIMIT; i++) {
-    const a = ((-90 + i * 30) * Math.PI) / 180;
-    const far = i % 2 === 1;
-    const rx = far ? 0.38 : 0.28;
-    const ry = far ? 0.27 : 0.195;
-    out.push({
-      x: Math.min(0.86, Math.max(0.14, 0.5 + Math.cos(a) * rx)),
-      y: Math.min(0.73, Math.max(0.26, 0.52 + Math.sin(a) * ry)),
-    });
-  }
-  return out;
+function angDist(a, b) {
+  let d = Math.abs(a - b) % 360;
+  if (d > 180) d = 360 - d;
+  return d;
 }
-const SLOTS = makeSlots();
-
-function clearance(age) {
-  if (age <= 2) return 0.13;
-  if (age <= 5) return 0.1;
-  if (age <= 8) return 0.08;
-  return 0.055;
+function needGap(age) {
+  if (age <= 2) return 48;
+  if (age <= 6) return 32;
+  return 16;
 }
-
 function pickEmptiest(occupied) {
   const used = new Set(occupied.map((o) => o.slot));
-  if (used.size >= SLOTS.length) return 0;
+  if (used.size >= ANGLES.length) return 0;
   let best = 0;
   let bestScore = -Infinity;
-  for (let s = 0; s < SLOTS.length; s++) {
+  for (let s = 0; s < ANGLES.length; s++) {
     if (used.has(s)) continue;
-    const p = SLOTS[s];
-    let minGap = 9;
+    let minGap = 180;
     for (const o of occupied) {
-      const q = SLOTS[o.slot];
-      const dist = Math.hypot((p.x - q.x) * 1.7, p.y - q.y);
-      minGap = Math.min(minGap, dist - clearance(0) - clearance(o.age));
+      minGap = Math.min(minGap, angDist(ANGLES[s], ANGLES[o.slot]) - needGap(o.age));
     }
-    const left = occupied.filter((o) => SLOTS[o.slot].x < 0.5).length;
-    const right = occupied.filter((o) => SLOTS[o.slot].x >= 0.5).length;
-    const top = occupied.filter((o) => SLOTS[o.slot].y < 0.52).length;
-    const bot = occupied.filter((o) => SLOTS[o.slot].y >= 0.52).length;
-    const score =
-      minGap +
-      (p.x < 0.5 ? right - left : left - right) * 0.05 +
-      (p.y < 0.52 ? bot - top : top - bot) * 0.04;
+    const left = occupied.filter((o) => Math.cos((ANGLES[o.slot] * Math.PI) / 180) < 0).length;
+    const right = occupied.length - left;
+    const onLeft = Math.cos((ANGLES[s] * Math.PI) / 180) < 0;
+    const score = minGap + (onLeft ? right - left : left - right) * 4;
     if (score > bestScore) {
       bestScore = score;
       best = s;
@@ -62,7 +43,6 @@ function pickEmptiest(occupied) {
   }
   return best;
 }
-
 function nextSlot(items) {
   const occupied = items
     .slice(0, ORBIT_LIMIT - 1)
@@ -98,7 +78,6 @@ export class Wall {
       if (body.length < 2 || body.length > 80) {
         return this.json({ error: "short" }, 400);
       }
-
       const items = (await this.state.storage.get("items")) || [];
       const seq = ((await this.state.storage.get("seq")) || 0) + 1;
       const count = ((await this.state.storage.get("count")) || items.length) + 1;
@@ -120,16 +99,13 @@ export class Wall {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
     if (url.pathname === "/api/impacts") {
       if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: cors() });
       }
       const id = env.WALL.idFromName("main");
-      const stub = env.WALL.get(id);
-      return stub.fetch(request);
+      return env.WALL.get(id).fetch(request);
     }
-
     return env.ASSETS.fetch(request);
   },
 };
