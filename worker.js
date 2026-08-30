@@ -7,9 +7,13 @@ function cors() {
   };
 }
 
+const STORE = new Request("https://athar.wall/items");
 const ORBIT_LIMIT = 18;
 const MAX_ITEMS = 500;
-const ANGLES = Array.from({ length: ORBIT_LIMIT }, (_, i) => -90 + (360 / ORBIT_LIMIT) * i + ((i % 3) - 1) * 5);
+const ANGLES = Array.from(
+  { length: ORBIT_LIMIT },
+  (_, i) => -90 + (360 / ORBIT_LIMIT) * i + ((i % 3) - 1) * 5,
+);
 
 function angDist(a, b) {
   let d = Math.abs(a - b) % 360;
@@ -51,61 +55,79 @@ function nextSlot(items) {
   return pickEmptiest(occupied);
 }
 
-export class Wall {
-  constructor(state) {
-    this.state = state;
+async function readState() {
+  const hit = await caches.default.match(STORE);
+  if (!hit) return { items: [], seq: 0, count: 0 };
+  try {
+    const data = await hit.json();
+    const items = Array.isArray(data.items) ? data.items : Array.isArray(data) ? data : [];
+    return {
+      items: items,
+      seq: Number(data.seq) || items.length,
+      count: Number(data.count) || items.length,
+    };
+  } catch {
+    return { items: [], seq: 0, count: 0 };
   }
+}
 
-  json(data, status) {
-    return Response.json(data, { status: status || 200, headers: cors() });
-  }
+async function writeState(state) {
+  await caches.default.put(
+    STORE,
+    new Response(JSON.stringify(state), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "max-age=31536000",
+      },
+    }),
+  );
+}
 
-  async fetch(request) {
-    if (request.method === "GET") {
-      const items = (await this.state.storage.get("items")) || [];
-      const count = (await this.state.storage.get("count")) || items.length;
-      return this.json({ items, count });
-    }
-
-    if (request.method === "POST") {
-      let body = "";
-      try {
-        const data = await request.json();
-        body = String(data.body || "").replace(/\s+/g, " ").trim();
-      } catch {
-        return this.json({ error: "bad" }, 400);
-      }
-      if (body.length < 2 || body.length > 80) {
-        return this.json({ error: "short" }, 400);
-      }
-      const items = (await this.state.storage.get("items")) || [];
-      const seq = ((await this.state.storage.get("seq")) || 0) + 1;
-      const count = ((await this.state.storage.get("count")) || items.length) + 1;
-      const row = {
-        id: seq,
-        text: body,
-        slot: nextSlot(items),
-        createdAt: new Date().toISOString(),
-      };
-      const next = [row, ...items].slice(0, MAX_ITEMS);
-      await this.state.storage.put({ seq: seq, count: count, items: next });
-      return this.json(row);
-    }
-
-    return new Response("Method Not Allowed", { status: 405, headers: cors() });
-  }
+function json(data, status) {
+  return Response.json(data, { status: status || 200, headers: cors() });
 }
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
     if (url.pathname === "/api/impacts") {
       if (request.method === "OPTIONS") {
         return new Response(null, { status: 204, headers: cors() });
       }
-      const id = env.WALL.idFromName("main");
-      return env.WALL.get(id).fetch(request);
+
+      if (request.method === "GET") {
+        const state = await readState();
+        return json({ items: state.items, count: state.count });
+      }
+
+      if (request.method === "POST") {
+        let body = "";
+        try {
+          const data = await request.json();
+          body = String(data.body || "").replace(/\s+/g, " ").trim();
+        } catch {
+          return json({ error: "bad" }, 400);
+        }
+        if (body.length < 2 || body.length > 80) {
+          return json({ error: "short" }, 400);
+        }
+        const state = await readState();
+        const seq = state.seq + 1;
+        const row = {
+          id: seq,
+          text: body,
+          slot: nextSlot(state.items),
+          createdAt: new Date().toISOString(),
+        };
+        const items = [row, ...state.items].slice(0, MAX_ITEMS);
+        await writeState({ items: items, seq: seq, count: state.count + 1 });
+        return json(row);
+      }
+
+      return new Response("Method Not Allowed", { status: 405, headers: cors() });
     }
+
     return env.ASSETS.fetch(request);
   },
 };
