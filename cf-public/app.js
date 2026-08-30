@@ -111,15 +111,24 @@ function esc(s) {
   const map = { "&": "&" + "amp;", "<": "&" + "lt;", ">": "&" + "gt;", '"': "&" + "quot;" };
   return String(s).replace(/[&<>"]/g, (c) => map[c]);
 }
+function applyPayload(raw) {
+  const items = (raw.items || []).map((it, i) => ({ id: Number(it.id) || i + 1, text: it.text || it.body || "", slot: it.slot }));
+  const count = Number(raw.count) || items.length;
+  if (data.items.length > 0 && items.length === 0) return;
+  data = { items: items, count: count };
+}
 async function load() {
   try {
     const res = await fetch("/api/impacts", { cache: "no-store" });
-    const raw = await res.json();
-    data = {
-      items: (raw.items || []).map((it, i) => ({ id: Number(it.id) || i + 1, text: it.text || it.body || "", slot: it.slot })),
-      count: Number(raw.count) || (raw.items || []).length,
-    };
+    applyPayload(await res.json());
   } catch (e) {}
+}
+function live() {
+  const proto = location.protocol === "https:" ? "wss:" : "ws:";
+  let ws;
+  try { ws = new WebSocket(proto + "//" + location.host + "/api/impacts/ws"); } catch (e) { return; }
+  ws.onmessage = (e) => { try { applyPayload(JSON.parse(e.data)); render(); } catch (err) {} };
+  ws.onclose = () => setTimeout(live, 1200);
 }
 async function plant() {
   const body = draft.replace(/\s+/g, " ").trim();
@@ -322,4 +331,5 @@ function shareView(copy) {
 }
 applyDir();
 load().then(render);
+live();
 setInterval(() => { if (path() === "/" || path() === "/all") load().then(render); }, 1200);
