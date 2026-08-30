@@ -111,37 +111,53 @@ function esc(s) {
   const map = { "&": "&" + "amp;", "<": "&" + "lt;", ">": "&" + "gt;", '"': "&" + "quot;" };
   return String(s).replace(/[&<>"]/g, (c) => map[c]);
 }
-function applyPayload(raw) {
-  const items = (raw.items || []).map((it, i) => ({ id: Number(it.id) || i + 1, text: it.text || it.body || "", slot: it.slot }));
-  const count = Number(raw.count) || items.length;
-  if (data.items.length > 0 && items.length === 0) return;
-  data = { items: items, count: count };
+function mergePayload(raw) {
+  const incoming = (raw.items || []).map((it, i) => ({ id: Number(it.id) || Date.now() + i, text: it.text || it.body || "", slot: it.slot }));
+  const map = new Map();
+  data.items.forEach((it) => map.set(String(it.id), it));
+  incoming.forEach((it) => map.set(String(it.id), it));
+  const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
+  if (!items.length) return;
+  data = { items: items, count: Math.max(Number(raw.count) || 0, items.length, data.count) };
 }
 async function load() {
   try {
     const res = await fetch("/api/impacts", { cache: "no-store" });
-    applyPayload(await res.json());
+    const raw = await res.json();
+    if ((raw.items || []).length) mergePayload(raw);
   } catch (e) {}
 }
+const TOPIC = "athar/neada005/wall";
+let bus;
+function publishWall() {
+  if (!bus || !bus.connected) return;
+  try { bus.publish(TOPIC, JSON.stringify({ items: data.items, count: data.count }), { retain: true, qos: 1 }); } catch (e) {}
+}
 function live() {
-  const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  let ws;
-  try { ws = new WebSocket(proto + "//" + location.host + "/api/impacts/ws"); } catch (e) { return; }
-  ws.onmessage = (e) => { try { applyPayload(JSON.parse(e.data)); render(); } catch (err) {} };
-  ws.onclose = () => setTimeout(live, 1200);
+  if (typeof mqtt === "undefined") return;
+  try { bus = mqtt.connect("wss://broker.emqx.io:8084/mqtt", { reconnectPeriod: 1500, clean: true }); } catch (e) { return; }
+  bus.on("connect", () => { try { bus.subscribe(TOPIC, { qos: 1 }); } catch (e) {} });
+  bus.on("message", function (_t, buf) {
+    try { mergePayload(JSON.parse(buf.toString())); render(); } catch (err) {}
+  });
 }
 async function plant() {
   const body = draft.replace(/\s+/g, " ").trim();
   if (body.length < 2) { error = t().tooShort; render(); return; }
   busy = true; error = ""; render();
+  const row = {
+    id: Date.now() * 100 + Math.floor(Math.random() * 100),
+    text: body,
+    slot: pickEmptiest(data.items.slice(0, 17).map((it, i) => ({ slot: it.slot, age: i + 1 }))),
+    createdAt: new Date().toISOString(),
+  };
+  mergePayload({ items: [row, ...data.items], count: data.count + 1 });
+  saved = body;
+  phase = "done";
+  publishWall();
   try {
-    const res = await fetch("/api/impacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }) });
-    if (!res.ok) throw new Error("fail");
-    const row = await res.json();
-    saved = row.text || row.body || body;
-    phase = "done";
-    await load();
-  } catch (e) { error = t().saveFail; }
+    await fetch("/api/impacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }) });
+  } catch (e) {}
   busy = false; render();
 }
 function startDark() {
@@ -332,4 +348,4 @@ function shareView(copy) {
 applyDir();
 load().then(render);
 live();
-setInterval(() => { if (path() === "/" || path() === "/all") load().then(render); }, 1200);
+setInterval(() => { if (path() === "/" || path() === "/all") load().then(render); }, 2000);
