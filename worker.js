@@ -7,9 +7,10 @@ function cors() {
   };
 }
 
-const STORE = new Request("https://athar.wall/items");
+const PN_CH = "athar-neada005-wall";
+const PN = "https://ps.pndsn.com";
 const ORBIT_LIMIT = 18;
-const MAX_ITEMS = 500;
+const MAX_ITEMS = 80;
 const ANGLES = Array.from(
   { length: ORBIT_LIMIT },
   (_, i) => -90 + (360 / ORBIT_LIMIT) * i + ((i % 3) - 1) * 5,
@@ -55,32 +56,36 @@ function nextSlot(items) {
   return pickEmptiest(occupied);
 }
 
-async function readState() {
-  const hit = await caches.default.match(STORE);
-  if (!hit) return { items: [], seq: 0, count: 0 };
-  try {
-    const data = await hit.json();
-    const items = Array.isArray(data.items) ? data.items : [];
-    return {
-      items: items,
-      seq: Number(data.seq) || items.length,
-      count: Number(data.count) || items.length,
-    };
-  } catch (e) {
-    return { items: [], seq: 0, count: 0 };
+async function readWall() {
+  const res = await fetch(PN + "/v2/history/sub-key/demo/channel/" + PN_CH + "?count=20");
+  const json = await res.json();
+  const msgs = json[0] || [];
+  const map = new Map();
+  let count = 0;
+  for (const m of msgs) {
+    if (!m || !Array.isArray(m.items) || !m.items.length) continue;
+    count = Math.max(count, Number(m.count) || 0);
+    for (const it of m.items) {
+      if (!it || !it.text) continue;
+      map.set(String(it.id), {
+        id: Number(it.id) || Date.now(),
+        text: String(it.text),
+        slot: it.slot,
+        createdAt: it.createdAt,
+      });
+    }
   }
+  const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
+  return { items: items, count: Math.max(count, items.length) };
 }
 
-async function writeState(state) {
-  await caches.default.put(
-    STORE,
-    new Response(JSON.stringify(state), {
-      headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "max-age=31536000",
-      },
-    }),
-  );
+async function writeWall(state) {
+  if (!state.items.length) return;
+  await fetch(PN + "/publish/demo/demo/0/" + PN_CH + "/0", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items: state.items.slice(0, MAX_ITEMS), count: state.count }),
+  });
 }
 
 function json(data, status) {
@@ -95,8 +100,12 @@ export default {
         return new Response(null, { status: 204, headers: cors() });
       }
       if (request.method === "GET") {
-        const state = await readState();
-        return json({ items: state.items, count: state.count });
+        try {
+          const wall = await readWall();
+          return json(wall);
+        } catch (e) {
+          return json({ items: [], count: 0 });
+        }
       }
       if (request.method === "POST") {
         let body = "";
@@ -109,16 +118,16 @@ export default {
         if (body.length < 2 || body.length > 80) {
           return json({ error: "short" }, 400);
         }
-        const state = await readState();
-        const seq = state.seq + 1;
+        const wall = await readWall();
         const row = {
-          id: seq,
+          id: Date.now() * 100 + Math.floor(Math.random() * 100),
           text: body,
-          slot: nextSlot(state.items),
+          slot: nextSlot(wall.items),
           createdAt: new Date().toISOString(),
         };
-        const items = [row, ...state.items].slice(0, MAX_ITEMS);
-        await writeState({ items: items, seq: seq, count: state.count + 1 });
+        const items = [row, ...wall.items].slice(0, MAX_ITEMS);
+        const next = { items: items, count: wall.count + 1 };
+        await writeWall(next);
         return json(row);
       }
       return new Response("Method Not Allowed", { status: 405, headers: cors() });
