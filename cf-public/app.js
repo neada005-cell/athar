@@ -185,7 +185,7 @@ function shareView(copy) {
       <h1 class="display" style="font-size:2rem">${esc(copy.writeTitle)}</h1></div>
       <div><textarea id="draft" maxlength="80" placeholder="${esc(copy.writePlaceholder)}">${esc(draft)}</textarea>
       <div class="muted" style="display:flex;justify-content:space-between;font-size:.75rem;margin-top:.5rem">
-      <span>${esc(error || copy.writeHint)}</span><span>${draft.length}/80</span></div></div>
+      <span>${esc(error)}</span><span>${draft.length}/80</span></div></div>
       <button class="btn solid wide" id="plant" ${busy ? "disabled" : ""}>${esc(busy ? copy.planting : copy.plant)}</button></main>`;
   }
   return `<main class="flow" style="text-align:center"><p class="muted" style="font-size:.75rem">${esc(copy.club)}</p>
