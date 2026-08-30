@@ -34,55 +34,43 @@ const dict = {
     inspireRest: "It disappeared, but the ripples it created kept spreading. Your impact may be the same; you may never see how far it reaches, but that doesn’t mean it has stopped.",
   },
 };
-const ORBIT_LIMIT = 12;
-function makeSlots() {
-  const out = [];
-  for (let i = 0; i < ORBIT_LIMIT; i++) {
-    const a = ((-90 + i * 30) * Math.PI) / 180;
-    const far = i % 2 === 1;
-    const rx = far ? 0.38 : 0.28;
-    const ry = far ? 0.27 : 0.195;
-    out.push({
-      x: Math.min(0.86, Math.max(0.14, 0.5 + Math.cos(a) * rx)),
-      y: Math.min(0.73, Math.max(0.26, 0.52 + Math.sin(a) * ry)),
-    });
-  }
-  return out;
-}
-const SLOTS = makeSlots();
+const ORBIT_LIMIT = 18;
+const ANGLES = Array.from({ length: ORBIT_LIMIT }, (_, i) => -90 + (360 / ORBIT_LIMIT) * i + ((i % 3) - 1) * 5);
+const RINGS = [{ rx: 0.4, ry: 0.29 }, { rx: 0.29, ry: 0.21 }, { rx: 0.175, ry: 0.13 }];
 function stageOf(age) {
-  if (age <= 2) return { size: 1.18, color: age % 2 === 0 ? "#f4f1ea" : "#d2c4a8", opacity: 1, visible: true };
-  if (age <= 5) return { size: 0.95, color: age % 2 === 0 ? "#e8e0d2" : "#c4b49a", opacity: 0.92, visible: true };
-  if (age <= 8) return { size: 0.76, color: "#8c8780", opacity: 0.55, visible: true };
-  if (age <= 11) return { size: 0.62, color: "#5c5954", opacity: 0.3, visible: true };
-  return { size: 0.5, color: "#5c5954", opacity: 0, visible: false };
+  if (age <= 2) return { ring: 0, size: 1.22, color: age % 2 === 0 ? "#f6f3ec" : "#d4c4a8", opacity: 1, visible: true };
+  if (age <= 6) return { ring: 1, size: 0.94, color: age % 2 === 0 ? "#e8e0d2" : "#c9b89a", opacity: 0.9, visible: true };
+  if (age <= 12) return { ring: 2, size: 0.7, color: "#8c8780", opacity: 0.52, visible: true };
+  if (age <= 17) return { ring: 2, size: 0.54, color: "#5c5954", opacity: 0.28, visible: true };
+  return { ring: 2, size: 0.45, color: "#5c5954", opacity: 0, visible: false };
 }
-function clearance(age) {
-  if (age <= 2) return 0.13;
-  if (age <= 5) return 0.1;
-  if (age <= 8) return 0.08;
-  return 0.055;
-}
+function angDist(a, b) { let d = Math.abs(a - b) % 360; if (d > 180) d = 360 - d; return d; }
+function needGap(age) { if (age <= 2) return 48; if (age <= 6) return 32; return 16; }
 function pickEmptiest(occupied) {
   const used = new Set(occupied.map((o) => o.slot));
-  if (used.size >= SLOTS.length) return 0;
+  if (used.size >= ANGLES.length) return 0;
   let best = 0, bestScore = -Infinity;
-  for (let s = 0; s < SLOTS.length; s++) {
+  for (let s = 0; s < ANGLES.length; s++) {
     if (used.has(s)) continue;
-    const p = SLOTS[s];
-    let minGap = 9;
-    for (const o of occupied) {
-      const q = SLOTS[o.slot];
-      minGap = Math.min(minGap, Math.hypot((p.x - q.x) * 1.7, p.y - q.y) - clearance(0) - clearance(o.age));
-    }
-    const left = occupied.filter((o) => SLOTS[o.slot].x < 0.5).length;
-    const right = occupied.filter((o) => SLOTS[o.slot].x >= 0.5).length;
-    const top = occupied.filter((o) => SLOTS[o.slot].y < 0.52).length;
-    const bot = occupied.filter((o) => SLOTS[o.slot].y >= 0.52).length;
-    const score = minGap + (p.x < 0.5 ? right - left : left - right) * 0.05 + (p.y < 0.52 ? bot - top : top - bot) * 0.04;
+    let minGap = 180;
+    for (const o of occupied) minGap = Math.min(minGap, angDist(ANGLES[s], ANGLES[o.slot]) - needGap(o.age));
+    const left = occupied.filter((o) => Math.cos((ANGLES[o.slot] * Math.PI) / 180) < 0).length;
+    const right = occupied.length - left;
+    const onLeft = Math.cos((ANGLES[s] * Math.PI) / 180) < 0;
+    const score = minGap + (onLeft ? right - left : left - right) * 4;
     if (score > bestScore) { bestScore = score; best = s; }
   }
   return best;
+}
+function at(slot, age) {
+  const st = stageOf(age);
+  const a = (ANGLES[slot] * Math.PI) / 180;
+  const ring = RINGS[st.ring];
+  return {
+    x: Math.min(0.88, Math.max(0.12, 0.5 + Math.cos(a) * ring.rx)),
+    y: Math.min(0.74, Math.max(0.24, 0.52 + Math.sin(a) * ring.ry)),
+    slot, ...st,
+  };
 }
 function layout(items) {
   const occupied = [];
@@ -90,13 +78,12 @@ function layout(items) {
     const st = stageOf(age);
     if (!st.visible) return { x: 0.5, y: 0.52, ...st };
     let slot = item.slot;
-    if (slot == null || slot < 0 || slot >= SLOTS.length || occupied.some((o) => o.slot === slot)) {
+    if (slot == null || slot < 0 || slot >= ANGLES.length || occupied.some((o) => o.slot === slot)) {
       slot = pickEmptiest(occupied);
       item.slot = slot;
     }
     occupied.push({ slot, age });
-    const p = SLOTS[slot];
-    return { x: p.x, y: p.y, slot, ...st };
+    return at(slot, age);
   });
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
@@ -129,11 +116,7 @@ async function load() {
     const res = await fetch("/api/impacts", { cache: "no-store" });
     const raw = await res.json();
     data = {
-      items: (raw.items || []).map((it, i) => ({
-        id: Number(it.id) || i + 1,
-        text: it.text || it.body || "",
-        slot: it.slot,
-      })),
+      items: (raw.items || []).map((it, i) => ({ id: Number(it.id) || i + 1, text: it.text || it.body || "", slot: it.slot })),
       count: Number(raw.count) || (raw.items || []).length,
     };
   } catch (e) {}
@@ -228,6 +211,8 @@ function patchOrbits() {
       requestAnimationFrame(function () { el.style.opacity = String(pos.opacity); });
       return;
     }
+    el.style.left = (pos.x * 100).toFixed(2) + "%";
+    el.style.top = (pos.y * 100).toFixed(2) + "%";
     el.style.fontSize = pos.size + "rem";
     el.style.color = pos.color;
     el.style.opacity = String(pos.opacity);
@@ -337,4 +322,4 @@ function shareView(copy) {
 }
 applyDir();
 load().then(render);
-setInterval(() => { if (path() === "/" || path() === "/all") load().then(render); }, 2500);
+setInterval(() => { if (path() === "/" || path() === "/all") load().then(render); }, 1200);
