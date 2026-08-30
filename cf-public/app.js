@@ -10,7 +10,7 @@ const dict = {
     writePlaceholder: "أخلي أحد يحس إنه قادر", plant: "اغرس الأثر",
     planting: "ينغرس...", tooShort: "اكتب جملة قصيرة.",
     saveFail: "ما قدرنا نحفظ الأثر.", doneTitle: "أثرُك انغرس.",
-    doneHint: "ارفع راسك على الجدار. لو تبي تكمل الأثر، تعال الركن وتعرّف علينا.",
+    doneHint: "لو تريد أن تصنع أثراً أكبر أنضم معنا",
     another: "أثر ثاني", back: "ارجع للجدار", viewAll: "جميع الآثار",
     allTitle: "جميع الآثار", allEmpty: "ما انغرس أثر للحين.",
     inspire: "إلهام",
@@ -28,7 +28,7 @@ const dict = {
     writePlaceholder: "I help someone believe they can", plant: "Plant it",
     planting: "Planting...", tooShort: "Write a short sentence.",
     saveFail: "Could not save your impact.", doneTitle: "Your impact is on the wall.",
-    doneHint: "Look up. If you want to go further, come meet us at the booth.",
+    doneHint: "If you want to leave a greater impact, join us",
     another: "Another impact", back: "Back to the wall", viewAll: "All impacts",
     allTitle: "All impacts", allEmpty: "Nothing planted yet.",
     inspire: "Inspiration",
@@ -52,8 +52,7 @@ function orbit(id, age) {
   return {
     x: Math.min(0.86, Math.max(0.14, x)),
     y: Math.min(0.68, Math.max(0.18, y)),
-    scale,
-    opacity,
+    scale, opacity,
     visible: age < ORBIT_LIMIT && opacity > 0.1,
   };
 }
@@ -274,10 +273,12 @@ function shareView(copy) {
       <button class="btn solid wide" id="plant" ${busy ? "disabled" : ""}>${esc(busy ? copy.planting : copy.plant)}</button></main>`;
   }
   return `<main class="flow" style="text-align:center"><p class="muted" style="font-size:.75rem">${esc(copy.club)}</p>
-    <div><p class="display" style="font-size:2.4rem">${esc(copy.doneTitle)}</p>
-    <p class="display" style="font-size:1.6rem;margin-top:1.5rem">${esc(saved)}</p>
-    <p class="muted" style="margin-top:1.25rem">${esc(copy.doneHint)}</p></div>
-    <div class="stack"><button class="btn solid wide" id="another">${esc(copy.another)}</button>
+    <div>
+      <p class="display" style="font-size:clamp(2.2rem,8vw,2.8rem);line-height:1.2">${esc(copy.doneTitle)}</p>
+      <p class="display" style="font-size:1.5rem;margin-top:1.75rem;line-height:1.4">${esc(saved)}</p>
+      <p class="muted" style="margin-top:1.25rem;font-size:.9rem">${esc(copy.doneHint)}</p>
+    </div>
+    <div class="actions"><button class="btn solid wide" id="another">${esc(copy.another)}</button>
     <a class="btn line wide" href="/" data-go="/">${esc(copy.back)}</a></div></main>`;
 }
 applyDir();
