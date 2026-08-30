@@ -37,42 +37,39 @@ const dict = {
   },
 };
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+const ORBIT_LIMIT = 12;
 function orbit(id, age) {
-  const angle = id * GOLDEN;
-  const ring = Math.max(0.12, 0.58 - age * 0.033);
-  const x = 0.5 + Math.cos(angle) * ring * 1.15;
-  const y = 0.46 + Math.sin(angle) * ring * 0.82;
-  const scale = Math.max(0.22, 1 - age * 0.055);
-  const opacity = Math.max(0, 1 - age * 0.07);
-  return { x, y, scale, opacity, visible: age < 14 && opacity > 0.08 };
+  const w = window.innerWidth || 390;
+  const h = window.innerHeight || 844;
+  const min = Math.min(w, h);
+  const angle = Number(id) * GOLDEN;
+  const t = Math.min(1, age / (ORBIT_LIMIT - 1));
+  const r = min * (0.36 - t * 0.22);
+  const x = 0.5 + Math.cos(angle) * (r / w);
+  const y = 0.45 + Math.sin(angle) * (r / h);
+  const scale = Math.max(0.24, 1 - t * 0.68);
+  const opacity = Math.max(0, 1 - Math.pow(t, 1.1) * 0.86);
+  return {
+    x: Math.min(0.86, Math.max(0.14, x)),
+    y: Math.min(0.68, Math.max(0.18, y)),
+    scale,
+    opacity,
+    visible: age < ORBIT_LIMIT && opacity > 0.1,
+  };
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
 function go(p) {
   if (p === "/share" && path() !== "/share") {
-    phase = "intro";
-    draft = "";
-    error = "";
-    saved = "";
-    showSkip = false;
-    darkLeft = 5;
-    clearTimeout(skipTimer);
-    clearTimeout(darkTimer);
-    clearInterval(tickTimer);
+    phase = "intro"; draft = ""; error = ""; saved = ""; showSkip = false; darkLeft = 5;
+    clearTimeout(skipTimer); clearTimeout(darkTimer); clearInterval(tickTimer);
   }
-  history.pushState({}, "", p);
-  render();
+  history.pushState({}, "", p); render();
 }
 window.addEventListener("popstate", render);
 let lang = localStorage.getItem("athar-lang") === "en" ? "en" : "ar";
 let data = { items: [], count: 0 };
-let phase = "intro";
-let draft = "";
-let error = "";
-let busy = false;
-let saved = "";
-let showSkip = false;
-let skipTimer, darkTimer, tickTimer;
-let darkLeft = 5;
+let phase = "intro"; let draft = ""; let error = ""; let busy = false; let saved = ""; let showSkip = false;
+let skipTimer, darkTimer, tickTimer; let darkLeft = 5;
 function t() { return dict[lang]; }
 function fmt(n) { return n.toLocaleString(lang === "ar" ? "ar-SA" : "en-US"); }
 function applyDir() {
@@ -88,7 +85,12 @@ function esc(s) {
 async function load() {
   try {
     const res = await fetch("/api/impacts");
-    data = await res.json();
+    const raw = await res.json();
+    const items = (raw.items || []).map((it, i) => ({
+      id: Number(it.id) || i + 1,
+      text: it.text || it.body || "",
+    }));
+    data = { items, count: Number(raw.count) || items.length };
   } catch (e) { /* keep */ }
 }
 async function plant() {
@@ -103,7 +105,7 @@ async function plant() {
     });
     if (!res.ok) throw new Error("fail");
     const row = await res.json();
-    saved = row.text;
+    saved = row.text || row.body || body;
     phase = "done";
     await load();
   } catch (e) { error = t().saveFail; }
@@ -117,9 +119,7 @@ function startDark() {
     const slot = document.getElementById("skip-slot");
     if (!slot) return;
     const btn = document.createElement("button");
-    btn.className = "btn ghost";
-    btn.id = "skip";
-    btn.style.marginTop = "2.5rem";
+    btn.className = "btn ghost"; btn.id = "skip"; btn.style.marginTop = "2.5rem";
     btn.textContent = t().skip;
     btn.onclick = () => { clearTimeout(darkTimer); clearInterval(tickTimer); phase = "write"; render(); };
     slot.replaceWith(btn);
@@ -129,11 +129,7 @@ function startDark() {
     const el = document.querySelector(".timer span");
     if (el) el.textContent = String(darkLeft);
   }, 1000);
-  darkTimer = setTimeout(() => {
-    clearInterval(tickTimer);
-    phase = "write";
-    render();
-  }, 5000);
+  darkTimer = setTimeout(() => { clearInterval(tickTimer); phase = "write"; render(); }, 5000);
 }
 function render() {
   applyDir();
@@ -143,10 +139,7 @@ function render() {
   if (p === "/inspire") { app.innerHTML = inspireView(copy); bindNav(); return; }
   if (p === "/all") { app.innerHTML = allView(copy); bindNav(); return; }
   if (p === "/share") { app.innerHTML = shareView(copy); bindShare(); return; }
-  if (app.querySelector(".ripple")) {
-    patchWall(copy);
-    return;
-  }
+  if (app.querySelector(".ripple")) { patchWall(copy); return; }
   app.innerHTML = wallView(copy);
   bindNav();
 }
@@ -154,17 +147,48 @@ function wordHtml() {
   return data.items.map((item, i) => {
     const pos = orbit(item.id, i);
     if (!pos.visible) return "";
-    const full = item.text.trim().split(/\s+/).length <= 4 ? " full" : "";
-    return `<p class="orbit${full}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.62+pos.scale*0.38).toFixed(2)}rem">${esc(item.text)}</p>`;
+    const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
+    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.7+pos.scale*0.5).toFixed(2)}rem;transform:translate(-50%,-50%) scale(${pos.scale.toFixed(3)})">${esc(item.text || "")}</p>`;
   }).join("");
 }
 function setText(id, text) {
   const el = document.getElementById(id);
   if (el) el.textContent = text;
 }
-function patchWall(copy) {
+function patchOrbits() {
   const layer = document.getElementById("orbits");
-  if (layer) layer.innerHTML = wordHtml();
+  if (!layer) return;
+  const seen = new Set();
+  data.items.forEach((item, i) => {
+    const pos = orbit(item.id, i);
+    const key = String(item.id);
+    seen.add(key);
+    if (!pos.visible) {
+      const gone = layer.querySelector('[data-id="' + key + '"]');
+      if (gone) gone.remove();
+      return;
+    }
+    const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
+    let el = layer.querySelector('[data-id="' + key + '"]');
+    if (!el) {
+      el = document.createElement("p");
+      el.className = "orbit" + full;
+      el.dataset.id = key;
+      el.textContent = item.text || "";
+      layer.appendChild(el);
+    }
+    el.style.left = (pos.x * 100).toFixed(2) + "%";
+    el.style.top = (pos.y * 100).toFixed(2) + "%";
+    el.style.opacity = String(pos.opacity);
+    el.style.fontSize = (0.7 + pos.scale * 0.5).toFixed(2) + "rem";
+    el.style.transform = "translate(-50%,-50%) scale(" + pos.scale.toFixed(3) + ")";
+  });
+  [...layer.children].forEach((el) => {
+    if (!seen.has(el.getAttribute("data-id"))) el.remove();
+  });
+}
+function patchWall(copy) {
+  patchOrbits();
   setText("count", fmt(data.count));
   setText("lang", copy.langSwitch);
   setText("planted-label", copy.planted);
