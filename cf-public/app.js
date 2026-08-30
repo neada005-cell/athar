@@ -4,7 +4,6 @@ const dict = {
     question: "ما الأثر الذي تريد تركه؟", writeMine: "أكتب أثرك",
     scan: "امسح واترك أثرك", langSwitch: "EN",
     introTitle: ["خمس ثواني.", "سؤال واحد.", "أثر يبقى."],
-    introBody: "اللحظة على جوالك، وبعدها أثرك يظهر على الجدار قدام الكل.",
     enter: "ادخل اللحظة", think: "فكّر. لا تكتب للحين.", skip: "تخطى",
     writeTitle: "أكتب أثرُك في جملة", writeHint: "أكثر من أربع كلمات لن تظهر كاملة على الجدار",
     writePlaceholder: "أخلي أحد يحس إنه قادر", plant: "اغرس الأثر",
@@ -18,11 +17,10 @@ const dict = {
     inspireRest: "فاختفت، لكن الدوائر التي صنعَتها ظلّت تمتد. هكذا قد يكون أثرك؛ قد لا ترى إلى أين يصل، لكن هذا لا يعني أنه توقّف.",
   },
   en: {
-    club: "Athar Club", fair: "Clubs Fair", planted: "impacts planted",
+    club: "Athar Club", planted: "impacts planted",
     question: "What impact do you want to leave?", writeMine: "Write yours",
     scan: "Scan and leave yours", langSwitch: "عربي",
     introTitle: ["Five seconds.", "One question.", "An impact that stays."],
-    introBody: "The moment is on your phone — then it appears on the wall.",
     enter: "Enter the moment", think: "Think. Don't write yet.", skip: "Skip",
     writeTitle: "Write your impact in one line", writeHint: "More than four words will not appear fully on the wall",
     writePlaceholder: "I help someone believe they can", plant: "Plant it",
@@ -36,33 +34,69 @@ const dict = {
     inspireRest: "It disappeared, but the ripples it created kept spreading. Your impact may be the same; you may never see how far it reaches, but that doesn’t mean it has stopped.",
   },
 };
-function polar(deg, rx, ry) {
-  const a = (deg * Math.PI) / 180;
-  return { x: 0.5 + Math.cos(a) * rx, y: 0.51 + Math.sin(a) * ry, visible: true };
+const ORBIT_LIMIT = 12;
+function makeSlots() {
+  const out = [];
+  for (let i = 0; i < ORBIT_LIMIT; i++) {
+    const a = ((-90 + i * 30) * Math.PI) / 180;
+    const far = i % 2 === 1;
+    const rx = far ? 0.38 : 0.28;
+    const ry = far ? 0.27 : 0.195;
+    out.push({
+      x: Math.min(0.86, Math.max(0.14, 0.5 + Math.cos(a) * rx)),
+      y: Math.min(0.73, Math.max(0.26, 0.52 + Math.sin(a) * ry)),
+    });
+  }
+  return out;
 }
-const SLOTS = [-90, -45, 0, 45, 90, 135, 180, 225].map((d) => polar(d, 0.33, 0.22));
-function hashId(id) {
-  let x = Number(id) | 0;
-  x = Math.imul(x ^ (x >>> 16), 0x7feb352d);
-  x = Math.imul(x ^ (x >>> 15), 0x846ca68b);
-  return (x ^ (x >>> 16)) >>> 0;
+const SLOTS = makeSlots();
+function stageOf(age) {
+  if (age <= 2) return { size: 1.14, color: "#e8e4db", opacity: 1, visible: true };
+  if (age <= 5) return { size: 0.94, color: "#c9b89a", opacity: 0.9, visible: true };
+  if (age <= 8) return { size: 0.76, color: "#8c8780", opacity: 0.55, visible: true };
+  if (age <= 11) return { size: 0.62, color: "#5c5954", opacity: 0.3, visible: true };
+  return { size: 0.5, color: "#5c5954", opacity: 0, visible: false };
+}
+function clearance(age) {
+  if (age <= 2) return 0.13;
+  if (age <= 5) return 0.1;
+  if (age <= 8) return 0.08;
+  return 0.055;
+}
+function pickEmptiest(occupied) {
+  const used = new Set(occupied.map((o) => o.slot));
+  if (used.size >= SLOTS.length) return 0;
+  let best = 0, bestScore = -Infinity;
+  for (let s = 0; s < SLOTS.length; s++) {
+    if (used.has(s)) continue;
+    const p = SLOTS[s];
+    let minGap = 9;
+    for (const o of occupied) {
+      const q = SLOTS[o.slot];
+      minGap = Math.min(minGap, Math.hypot((p.x - q.x) * 1.7, p.y - q.y) - clearance(0) - clearance(o.age));
+    }
+    const left = occupied.filter((o) => SLOTS[o.slot].x < 0.5).length;
+    const right = occupied.filter((o) => SLOTS[o.slot].x >= 0.5).length;
+    const top = occupied.filter((o) => SLOTS[o.slot].y < 0.52).length;
+    const bot = occupied.filter((o) => SLOTS[o.slot].y >= 0.52).length;
+    const score = minGap + (p.x < 0.5 ? right - left : left - right) * 0.05 + (p.y < 0.52 ? bot - top : top - bot) * 0.04;
+    if (score > bestScore) { bestScore = score; best = s; }
+  }
+  return best;
 }
 function layout(items) {
-  const used = new Set();
+  const occupied = [];
   return items.map((item, age) => {
-    if (age >= SLOTS.length) return { x: 0.5, y: 0.51, visible: false };
-    if (item.slot != null && item.slot >= 0 && item.slot < SLOTS.length && !used.has(item.slot)) {
-      used.add(item.slot);
-      return SLOTS[item.slot];
+    const st = stageOf(age);
+    if (!st.visible) return { x: 0.5, y: 0.52, ...st };
+    let slot = item.slot;
+    if (slot == null || slot < 0 || slot >= SLOTS.length || occupied.some((o) => o.slot === slot)) {
+      slot = pickEmptiest(occupied);
+      item.slot = slot;
     }
-    const start = hashId(item.id) % SLOTS.length;
-    let idx = start;
-    for (let n = 0; n < SLOTS.length; n++) {
-      idx = (start + n) % SLOTS.length;
-      if (!used.has(idx)) break;
-    }
-    used.add(idx);
-    return SLOTS[idx];
+    occupied.push({ slot, age });
+    const p = SLOTS[slot];
+    return { x: p.x, y: p.y, slot, ...st };
   });
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
@@ -96,7 +130,7 @@ function recalled() {
 }
 function remember(items, count) {
   try { localStorage.setItem("athar-wall", JSON.stringify({ items: items.slice(0, 200), count })); }
-  catch (e) { /* quota */ }
+  catch (e) {}
 }
 async function load() {
   const local = recalled();
@@ -107,18 +141,15 @@ async function load() {
     const res = await fetch("/api/impacts", { cache: "no-store" });
     const raw = await res.json();
     const serverItems = (raw.items || []).map((it, i) => ({
-      id: Number(it.id) || i + 1,
-      text: it.text || it.body || "",
-      slot: it.slot,
+      id: Number(it.id) || i + 1, text: it.text || it.body || "", slot: it.slot,
     }));
     const map = new Map();
     for (const it of (local && local.items) || []) map.set(Number(it.id), it);
     for (const it of data.items) map.set(Number(it.id), it);
     for (const it of serverItems) map.set(Number(it.id), it);
     const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
-    const count = Math.max(Number(raw.count) || 0, items.length);
-    data = { items, count };
-    remember(items, count);
+    data = { items, count: Math.max(Number(raw.count) || 0, items.length) };
+    remember(items, data.count);
   } catch (e) {
     if (local && local.items && local.items.length) {
       data = { items: local.items, count: local.count || local.items.length };
@@ -130,14 +161,14 @@ async function plant() {
   if (body.length < 2) { error = t().tooShort; render(); return; }
   busy = true; error = ""; render();
   try {
-    const res = await fetch("/api/impacts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
+    const res = await fetch("/api/impacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ body }) });
     if (!res.ok) throw new Error("fail");
     const row = await res.json();
     saved = row.text || row.body || body;
+    if (row.slot != null) {
+      data.items = [{ id: Number(row.id) || Date.now(), text: saved, slot: row.slot }, ...data.items];
+      data.count += 1;
+    }
     phase = "done";
     await load();
   } catch (e) { error = t().saveFail; }
@@ -181,7 +212,7 @@ function wordHtml() {
     const pos = places[i];
     if (!pos.visible) return "";
     const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
-    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;font-size:1.05rem;transform:translate(-50%,-50%)">${esc(item.text || "")}</p>`;
+    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;font-size:${pos.size}rem;color:${pos.color};opacity:${pos.opacity};transform:translate(-50%,-50%)">${esc(item.text || "")}</p>`;
   }).join("");
 }
 function setText(id, text) {
@@ -199,25 +230,35 @@ function patchOrbits() {
     seen.add(key);
     if (!pos.visible) {
       const gone = layer.querySelector('[data-id="' + key + '"]');
-      if (gone) gone.remove();
+      if (gone) { gone.style.opacity = "0"; setTimeout(() => gone.remove(), 900); }
       return;
     }
-    if (layer.querySelector('[data-id="' + key + '"]')) return;
-    const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
-    const el = document.createElement("p");
-    el.className = "orbit" + full;
-    el.dataset.id = key;
-    el.textContent = item.text || "";
-    el.style.left = (pos.x * 100).toFixed(2) + "%";
-    el.style.top = (pos.y * 100).toFixed(2) + "%";
-    el.style.opacity = "0";
-    el.style.fontSize = "1.05rem";
-    el.style.transform = "translate(-50%,-50%)";
-    layer.appendChild(el);
-    requestAnimationFrame(function () { el.style.opacity = "1"; });
+    let el = layer.querySelector('[data-id="' + key + '"]');
+    if (!el) {
+      const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
+      el = document.createElement("p");
+      el.className = "orbit" + full;
+      el.dataset.id = key;
+      el.textContent = item.text || "";
+      el.style.left = (pos.x * 100).toFixed(2) + "%";
+      el.style.top = (pos.y * 100).toFixed(2) + "%";
+      el.style.fontSize = pos.size + "rem";
+      el.style.color = pos.color;
+      el.style.opacity = "0";
+      el.style.transform = "translate(-50%,-50%)";
+      layer.appendChild(el);
+      requestAnimationFrame(function () { el.style.opacity = String(pos.opacity); });
+      return;
+    }
+    el.style.fontSize = pos.size + "rem";
+    el.style.color = pos.color;
+    el.style.opacity = String(pos.opacity);
   });
   [...layer.children].forEach((el) => {
-    if (!seen.has(el.getAttribute("data-id"))) el.remove();
+    if (!seen.has(el.getAttribute("data-id"))) {
+      el.style.opacity = "0";
+      setTimeout(() => el.remove(), 900);
+    }
   });
 }
 function patchWall(copy) {
