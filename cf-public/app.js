@@ -47,7 +47,21 @@ function orbit(id, age) {
   return { x, y, scale, opacity, visible: age < 14 && opacity > 0.08 };
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
-function go(p) { history.pushState({}, "", p); render(); }
+function go(p) {
+  if (p === "/share" && path() !== "/share") {
+    phase = "intro";
+    draft = "";
+    error = "";
+    saved = "";
+    showSkip = false;
+    darkLeft = 5;
+    clearTimeout(skipTimer);
+    clearTimeout(darkTimer);
+    clearInterval(tickTimer);
+  }
+  history.pushState({}, "", p);
+  render();
+}
 window.addEventListener("popstate", render);
 let lang = localStorage.getItem("athar-lang") === "en" ? "en" : "ar";
 let data = { items: [], count: 0 };
@@ -57,7 +71,8 @@ let error = "";
 let busy = false;
 let saved = "";
 let showSkip = false;
-let skipTimer, darkTimer;
+let skipTimer, darkTimer, tickTimer;
+let darkLeft = 5;
 function t() { return dict[lang]; }
 function fmt(n) { return n.toLocaleString(lang === "ar" ? "ar-SA" : "en-US"); }
 function applyDir() {
@@ -95,10 +110,30 @@ async function plant() {
   busy = false; render();
 }
 function startDark() {
-  phase = "dark"; showSkip = false; render();
-  clearTimeout(skipTimer); clearTimeout(darkTimer);
-  skipTimer = setTimeout(() => { showSkip = true; render(); }, 1800);
-  darkTimer = setTimeout(() => { phase = "write"; render(); }, 5000);
+  phase = "dark"; showSkip = false; darkLeft = 5; render();
+  clearTimeout(skipTimer); clearTimeout(darkTimer); clearInterval(tickTimer);
+  skipTimer = setTimeout(() => {
+    showSkip = true;
+    const slot = document.getElementById("skip-slot");
+    if (!slot) return;
+    const btn = document.createElement("button");
+    btn.className = "btn ghost";
+    btn.id = "skip";
+    btn.style.marginTop = "2.5rem";
+    btn.textContent = t().skip;
+    btn.onclick = () => { clearTimeout(darkTimer); clearInterval(tickTimer); phase = "write"; render(); };
+    slot.replaceWith(btn);
+  }, 1800);
+  tickTimer = setInterval(() => {
+    darkLeft = Math.max(0, darkLeft - 1);
+    const el = document.querySelector(".timer span");
+    if (el) el.textContent = String(darkLeft);
+  }, 1000);
+  darkTimer = setTimeout(() => {
+    clearInterval(tickTimer);
+    phase = "write";
+    render();
+  }, 5000);
 }
 function render() {
   applyDir();
@@ -123,7 +158,7 @@ function bindShare() {
   const enter = document.getElementById("enter");
   if (enter) enter.onclick = startDark;
   const skip = document.getElementById("skip");
-  if (skip) skip.onclick = () => { clearTimeout(darkTimer); phase = "write"; render(); };
+  if (skip) skip.onclick = () => { clearTimeout(darkTimer); clearInterval(tickTimer); phase = "write"; render(); };
   const ta = document.getElementById("draft");
   if (ta) ta.oninput = (e) => { draft = e.target.value; error = ""; };
   const plantBtn = document.getElementById("plant");
@@ -174,11 +209,15 @@ function shareView(copy) {
       <button class="btn solid wide" id="enter">${esc(copy.enter)}</button></main>`;
   }
   if (phase === "dark") {
-    return `<main class="flow" style="justify-content:center;text-align:center">
+    return `<main class="flow" style="justify-content:center;text-align:center;position:relative">
       <button class="lang" id="lang" style="position:absolute;top:2rem;inset-inline-end:1.25rem">${copy.langSwitch}</button>
+      <div class="timer"><svg viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="45" fill="none" stroke="var(--border)" stroke-width="1.2"/>
+        <circle class="ring-fill" cx="48" cy="48" r="45" fill="none" stroke="var(--fg)" stroke-width="1.4" stroke-linecap="round"/>
+      </svg><span>${darkLeft}</span></div>
       <p class="display" style="font-size:2rem">${esc(copy.question)}</p>
       <p class="muted" style="margin-top:1rem">${esc(copy.think)}</p>
-      ${showSkip ? `<button class="btn ghost" id="skip" style="margin-top:2.5rem">${esc(copy.skip)}</button>` : `<div style="height:3rem;margin-top:2.5rem"></div>`}</main>`;
+      ${showSkip ? `<button class="btn ghost" id="skip" style="margin-top:2.5rem">${esc(copy.skip)}</button>` : `<div id="skip-slot" style="height:3rem;margin-top:2.5rem"></div>`}</main>`;
   }
   if (phase === "write") {
     return `<main class="flow"><div><p class="muted" style="font-size:.75rem">${esc(copy.question)}</p>
