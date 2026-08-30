@@ -7,7 +7,7 @@ function cors() {
   };
 }
 
-const PN_CH = "athar-neada005-wall";
+const PN_CH = "athar-neada005-wall-v2";
 const PN = "https://ps.pndsn.com";
 const ORBIT_LIMIT = 18;
 const MAX_ITEMS = 80;
@@ -57,30 +57,24 @@ function nextSlot(items) {
 }
 
 async function readWall() {
-  const res = await fetch(PN + "/v2/history/sub-key/demo/channel/" + PN_CH + "?count=20");
+  const res = await fetch(PN + "/v2/history/sub-key/demo/channel/" + PN_CH + "?count=1");
+  if (!res.ok) throw new Error("store");
   const json = await res.json();
-  const msgs = json[0] || [];
-  const map = new Map();
-  let count = 0;
-  for (const m of msgs) {
-    if (!m || !Array.isArray(m.items) || !m.items.length) continue;
-    count = Math.max(count, Number(m.count) || 0);
-    for (const it of m.items) {
-      if (!it || !it.text) continue;
-      map.set(String(it.id), {
-        id: Number(it.id) || Date.now(),
-        text: String(it.text),
-        slot: it.slot,
-        createdAt: it.createdAt,
-      });
-    }
-  }
-  const items = [...map.values()].sort((a, b) => Number(b.id) - Number(a.id));
-  return { items: items, count: Math.max(count, items.length) };
+  const last = (json[0] || []).slice(-1)[0];
+  if (!last || !Array.isArray(last.items)) return { items: [], count: 0 };
+  const items = last.items
+    .filter((it) => it && it.text)
+    .map((it) => ({
+      id: Number(it.id) || Date.now(),
+      text: String(it.text),
+      slot: it.slot,
+      createdAt: it.createdAt,
+    }))
+    .sort((a, b) => Number(b.id) - Number(a.id));
+  return { items: items, count: Number(last.count) || items.length };
 }
 
 async function writeWall(state) {
-  if (!state.items.length) return;
   await fetch(PN + "/publish/demo/demo/0/" + PN_CH + "/0", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -104,7 +98,7 @@ export default {
           const wall = await readWall();
           return json(wall);
         } catch (e) {
-          return json({ items: [], count: 0 });
+          return json({ error: "down" }, 503);
         }
       }
       if (request.method === "POST") {
