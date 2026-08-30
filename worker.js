@@ -83,8 +83,9 @@ export class Wall {
 
     if (request.method === "POST") {
       let body = "";
+      let data = {};
       try {
-        const data = await request.json();
+        data = await request.json();
         body = String(data.body || "").replace(/\s+/g, " ").trim();
       } catch {
         return Response.json({ error: "bad" }, { status: 400, headers: cors() });
@@ -92,11 +93,16 @@ export class Wall {
       if (body.length < 2 || body.length > 80) {
         return Response.json({ error: "short" }, { status: 400, headers: cors() });
       }
+      const incomingId = Number(data.id) || 0;
+      const existing = incomingId ? items.find((it) => Number(it.id) === incomingId) : null;
+      if (existing) {
+        return Response.json(existing, { headers: cors() });
+      }
       const row = {
-        id: Date.now(),
+        id: incomingId || Date.now(),
         text: body,
-        slot: nextSlot(items),
-        createdAt: new Date().toISOString(),
+        slot: data.slot != null ? Number(data.slot) : nextSlot(items),
+        createdAt: data.createdAt || new Date().toISOString(),
       };
       const next = [row, ...items].slice(0, 500);
       await this.state.storage.put("items", next);
