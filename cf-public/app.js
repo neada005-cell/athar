@@ -36,24 +36,34 @@ const dict = {
     inspireRest: "It disappeared, but the ripples it created kept spreading. Your impact may be the same; you may never see how far it reaches, but that doesn’t mean it has stopped.",
   },
 };
-const GOLDEN = Math.PI * (3 - Math.sqrt(5));
-const ORBIT_LIMIT = 12;
-function orbit(id, age) {
+const RINGS = [
+  { r: 0.37, n: 5, scale: 1, opacity: 1, spin: 0.5 },
+  { r: 0.275, n: 4, scale: 0.76, opacity: 0.8, spin: 0.25 },
+  { r: 0.21, n: 3, scale: 0.56, opacity: 0.58, spin: 0.08 },
+];
+function orbitSlots() {
+  const slots = [];
+  for (const ring of RINGS) {
+    for (let i = 0; i < ring.n; i++) {
+      slots.push({
+        angle: -Math.PI / 2 + ((i + ring.spin) / ring.n) * Math.PI * 2,
+        r: ring.r, scale: ring.scale, opacity: ring.opacity,
+      });
+    }
+  }
+  return slots;
+}
+const SLOTS = orbitSlots();
+function orbit(_id, age) {
+  const slot = SLOTS[age];
+  if (!slot) return { x: 0.5, y: 0.46, scale: 0.2, opacity: 0, visible: false };
   const w = window.innerWidth || 390;
   const h = window.innerHeight || 844;
   const min = Math.min(w, h);
-  const angle = Number(id) * GOLDEN;
-  const t = Math.min(1, age / (ORBIT_LIMIT - 1));
-  const r = min * (0.36 - t * 0.22);
-  const x = 0.5 + Math.cos(angle) * (r / w);
-  const y = 0.45 + Math.sin(angle) * (r / h);
-  const scale = Math.max(0.24, 1 - t * 0.68);
-  const opacity = Math.max(0, 1 - Math.pow(t, 1.1) * 0.86);
   return {
-    x: Math.min(0.86, Math.max(0.14, x)),
-    y: Math.min(0.68, Math.max(0.18, y)),
-    scale, opacity,
-    visible: age < ORBIT_LIMIT && opacity > 0.1,
+    x: 0.5 + Math.cos(slot.angle) * (slot.r * min / w),
+    y: 0.45 + Math.sin(slot.angle) * (slot.r * min / h),
+    scale: slot.scale, opacity: slot.opacity, visible: true,
   };
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
@@ -196,6 +206,8 @@ function patchWall(copy) {
   setText("scan", copy.scan);
   setText("inspire-btn", copy.inspire);
   setText("write-btn", copy.writeMine);
+  const q = document.getElementById("question");
+  if (q) q.style.display = data.items.length ? "none" : "";
 }
 function bindNav() {
   document.querySelectorAll("[data-go]").forEach((el) => {
@@ -221,12 +233,13 @@ function wallView(copy) {
   const share = location.origin + "/share";
   const qr = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&bgcolor=e8e4db&color=08090b&data=" + encodeURIComponent(share);
   const rings = [0,1,2,3,4,5,6].map((i) => `<circle cx="50%" cy="46%" r="42%" style="animation-delay:${i*-1.4}s" />`).join("");
+  const qHide = data.items.length ? ";display:none" : "";
   return `<main class="page"><svg class="ripple" aria-hidden="true">${rings}</svg><div id="orbits">${wordHtml()}</div>
     <header class="top"><img src="/logo-athar.svg" alt="أثر" width="68" height="68" style="width:4.25rem;height:4.25rem;object-fit:contain" />
     <div style="text-align:end"><button class="lang" id="lang">${copy.langSwitch}</button>
     <p class="muted" style="font-size:.9rem"><span id="count" style="color:var(--fg)">${fmt(data.count)}</span> <span id="planted-label">${esc(copy.planted)}</span></p>
     <a href="/all" data-go="/all" class="muted" id="view-all" style="font-size:.75rem;text-decoration:underline">${esc(copy.viewAll)}</a></div></header>
-    <div class="center"><p class="hero">أثر</p><p class="muted" id="question" style="margin-top:1.25rem;max-width:24rem">${esc(copy.question)}</p></div>
+    <div class="center"><p class="hero">أثر</p><p class="muted" id="question" style="margin-top:1.25rem;max-width:24rem${qHide}">${esc(copy.question)}</p></div>
     <div class="bottom"><figure class="qr"><img src="${qr}" alt="QR" width="96" height="96" /><span id="scan">${esc(copy.scan)}</span></figure>
     <div class="stack"><a class="btn line" href="/inspire" data-go="/inspire" id="inspire-btn">${esc(copy.inspire)}</a>
     <a class="btn solid" href="/share" data-go="/share" id="write-btn">${esc(copy.writeMine)}</a></div></div></main>`;
