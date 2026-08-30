@@ -7,6 +7,7 @@ function cors() {
   };
 }
 
+const STORE = new Request("https://athar.wall/items");
 const ORBIT_LIMIT = 18;
 const MAX_ITEMS = 500;
 const ANGLES = Array.from(
@@ -64,10 +65,32 @@ export class Wall {
   }
 
   async snapshot() {
-    const items = (await this.state.storage.get("items")) || [];
-    const seq = (await this.state.storage.get("seq")) || 0;
-    const count = (await this.state.storage.get("count")) || items.length;
+    let items = (await this.state.storage.get("items")) || [];
+    let seq = (await this.state.storage.get("seq")) || 0;
+    let count = (await this.state.storage.get("count")) || items.length;
+    if (!items.length) {
+      const hit = await caches.default.match(STORE);
+      if (hit) {
+        try {
+          const cached = await hit.json();
+          const restored = cached.items || [];
+          if (restored.length) {
+            items = restored;
+            seq = cached.seq || restored.length;
+            count = cached.count || restored.length;
+            await this.state.storage.put({ items: items, seq: seq, count: count });
+          }
+        } catch (e) {}
+      }
+    }
     return { items: items, seq: seq, count: count };
+  }
+
+  async persist(state) {
+    await this.state.storage.put(state);
+    await caches.default.put(STORE, new Response(JSON.stringify(state), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "max-age=31536000" },
+    }));
   }
 
   async broadcast() {
@@ -112,7 +135,7 @@ export class Wall {
         createdAt: new Date().toISOString(),
       };
       const next = [row, ...snap.items].slice(0, MAX_ITEMS);
-      await this.state.storage.put({ seq: nextSeq, count: snap.count + 1, items: next });
+      await this.persist({ seq: nextSeq, count: snap.count + 1, items: next });
       await this.broadcast();
       return this.json(row);
     }
