@@ -36,23 +36,30 @@ const dict = {
     inspireRest: "It disappeared, but the ripples it created kept spreading. Your impact may be the same; you may never see how far it reaches, but that doesn’t mean it has stopped.",
   },
 };
-function polar(deg, rx, ry, scale, opacity) {
+function polar(deg, rx, ry) {
   const a = (deg * Math.PI) / 180;
-  return { x: 0.5 + Math.cos(a) * rx, y: 0.51 + Math.sin(a) * ry, scale, opacity, visible: true };
+  return { x: 0.5 + Math.cos(a) * rx, y: 0.51 + Math.sin(a) * ry, visible: true };
 }
-const SLOTS = [
-  polar(-90, 0.34, 0.23, 1, 1),
-  polar(-30, 0.34, 0.23, 1, 1),
-  polar(30, 0.34, 0.23, 1, 1),
-  polar(90, 0.34, 0.23, 1, 1),
-  polar(150, 0.34, 0.23, 1, 1),
-  polar(210, 0.34, 0.23, 1, 1),
-  polar(0, 0.2, 0.135, 0.78, 0.84),
-  polar(120, 0.2, 0.135, 0.78, 0.84),
-  polar(240, 0.2, 0.135, 0.78, 0.84),
-];
-function orbit(_id, age) {
-  return SLOTS[age] || { x: 0.5, y: 0.51, scale: 0.2, opacity: 0, visible: false };
+const SLOTS = [-90, -45, 0, 45, 90, 135, 180, 225].map((d) => polar(d, 0.33, 0.22));
+function hashId(id) {
+  let x = Number(id) | 0;
+  x = Math.imul(x ^ (x >>> 16), 0x7feb352d);
+  x = Math.imul(x ^ (x >>> 15), 0x846ca68b);
+  return (x ^ (x >>> 16)) >>> 0;
+}
+function layout(items) {
+  const used = new Set();
+  return items.map((item, age) => {
+    if (age >= SLOTS.length) return { x: 0.5, y: 0.51, visible: false };
+    const start = hashId(item.id) % SLOTS.length;
+    let idx = start;
+    for (let n = 0; n < SLOTS.length; n++) {
+      idx = (start + n) % SLOTS.length;
+      if (!used.has(idx)) break;
+    }
+    used.add(idx);
+    return SLOTS[idx];
+  });
 }
 function path() { return location.pathname.replace(/\/$/, "") || "/"; }
 function go(p) {
@@ -141,11 +148,12 @@ function render() {
   bindNav();
 }
 function wordHtml() {
+  const places = layout(data.items);
   return data.items.map((item, i) => {
-    const pos = orbit(item.id, i);
+    const pos = places[i];
     if (!pos.visible) return "";
     const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
-    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;opacity:${pos.opacity};font-size:${(0.88+pos.scale*0.28).toFixed(2)}rem;transform:translate(-50%,-50%) scale(${pos.scale.toFixed(3)})">${esc(item.text || "")}</p>`;
+    return `<p class="orbit${full}" data-id="${item.id}" style="left:${(pos.x*100).toFixed(2)}%;top:${(pos.y*100).toFixed(2)}%;font-size:1.05rem;transform:translate(-50%,-50%)">${esc(item.text || "")}</p>`;
   }).join("");
 }
 function setText(id, text) {
@@ -155,9 +163,10 @@ function setText(id, text) {
 function patchOrbits() {
   const layer = document.getElementById("orbits");
   if (!layer) return;
+  const places = layout(data.items);
   const seen = new Set();
   data.items.forEach((item, i) => {
-    const pos = orbit(item.id, i);
+    const pos = places[i];
     const key = String(item.id);
     seen.add(key);
     if (!pos.visible) {
@@ -165,26 +174,19 @@ function patchOrbits() {
       if (gone) gone.remove();
       return;
     }
+    if (layer.querySelector('[data-id="' + key + '"]')) return;
     const full = (item.text || "").trim().split(/\s+/).length <= 4 ? " full" : "";
-    let el = layer.querySelector('[data-id="' + key + '"]');
-    const left = (pos.x * 100).toFixed(2) + "%";
-    const top = (pos.y * 100).toFixed(2) + "%";
-    const size = (0.88 + pos.scale * 0.28).toFixed(2) + "rem";
-    const tf = "translate(-50%,-50%) scale(" + pos.scale.toFixed(3) + ")";
-    if (!el) {
-      el = document.createElement("p");
-      el.className = "orbit" + full;
-      el.dataset.id = key;
-      el.textContent = item.text || "";
-      el.style.transition = "none";
-      el.style.left = left; el.style.top = top; el.style.opacity = String(pos.opacity);
-      el.style.fontSize = size; el.style.transform = tf;
-      layer.appendChild(el);
-      requestAnimationFrame(function () { el.style.transition = ""; });
-      return;
-    }
-    el.style.left = left; el.style.top = top; el.style.opacity = String(pos.opacity);
-    el.style.fontSize = size; el.style.transform = tf;
+    const el = document.createElement("p");
+    el.className = "orbit" + full;
+    el.dataset.id = key;
+    el.textContent = item.text || "";
+    el.style.left = (pos.x * 100).toFixed(2) + "%";
+    el.style.top = (pos.y * 100).toFixed(2) + "%";
+    el.style.opacity = "0";
+    el.style.fontSize = "1.05rem";
+    el.style.transform = "translate(-50%,-50%)";
+    layer.appendChild(el);
+    requestAnimationFrame(function () { el.style.opacity = "1"; });
   });
   [...layer.children].forEach((el) => {
     if (!seen.has(el.getAttribute("data-id"))) el.remove();
